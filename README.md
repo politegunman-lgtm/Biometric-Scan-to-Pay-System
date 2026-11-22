@@ -47,9 +47,18 @@ npm run build        # production build
 
 It is a mobile-first web app, so no app store build is required.
 
-**From this machine (LAN).** `npm run dev` already binds `0.0.0.0`. Keep the phone on the same Wi-Fi and open
-`http://<your-computer-lan-ip>:3000` — on macOS/Linux find the address with `ipconfig getifaddr en0` or
-`hostname -I`. The device frame disappears below 640 px and the bottom tab bar takes over.
+**From this machine (LAN).** Run `npm run dev:phone`. It starts the server on `0.0.0.0:3000`, waits for it to answer,
+then prints the LAN URL and a terminal QR code to scan with the phone camera:
+
+```
+ Scan to Pay — open this on a phone on the same Wi-Fi
+ this computer:  http://127.0.0.1:3000
+ phone:          http://192.168.1.24:3000
+ █▀▀▀▀▀█ ▄▀ ▄▀▄ █▀▀▀▀▀█   ← scan this
+```
+
+`npm run dev` works too if you prefer to read the IP yourself (`ipconfig getifaddr en0` on macOS, `hostname -I` on
+Linux). The device frame disappears below 640 px and the bottom tab bar takes over.
 
 **Add to Home Screen.** The app ships a web manifest, an Apple touch icon (`apple-icon.png`) and
 `display: standalone`, so Safari → Share → *Add to Home Screen* (or Chrome → ⋮ → *Install app*) opens it fullscreen
