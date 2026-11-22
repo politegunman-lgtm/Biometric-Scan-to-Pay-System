@@ -135,6 +135,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refresh]);
 
+  /*
+   * Boot watchdog: if the first state fetch never settles (blocked dev asset,
+   * wrong host, offline phone) the screen would sit on "Verifying device key"
+   * forever with no explanation. After a few seconds, say something useful.
+   */
+  useEffect(() => {
+    if (state) return;
+    const id = window.setTimeout(() => {
+      setError(
+        (prev) =>
+          prev ??
+          "Still waiting for the wallet service. On a phone, make sure this host is allowed by the dev server (allowedDevOrigins) and that /api/state is reachable.",
+      );
+    }, 9000);
+    return () => window.clearTimeout(id);
+  }, [state]);
+
   /* Light polling keeps the queue, alerts and network profile live. */
   useEffect(() => {
     const id = window.setInterval(() => {

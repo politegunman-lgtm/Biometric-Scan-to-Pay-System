@@ -33,8 +33,11 @@ function lanAddresses(): Lan[] {
       out.push({ name, address: info.address, virtual: VIRTUAL_INTERFACE.test(name) });
     }
   }
-  // Real Wi-Fi/Ethernet first, VPN/VM adapters last.
-  return out.sort((a, b) => Number(a.virtual) - Number(b.virtual));
+  // Real Wi-Fi/Ethernet first, VPN/VM adapters last. 172.16–31 is also the
+  // Hyper-V / WSL / Docker range on Windows, which a phone can rarely reach,
+  // so those addresses rank below normal 192.168.x / 10.x LAN addresses.
+  const rank = (l: Lan) => Number(l.virtual) * 2 + (/^172\.(1[6-9]|2\d|3[01])\./.test(l.address) ? 1 : 0);
+  return out.sort((a, b) => rank(a) - rank(b));
 }
 
 async function waitForServer(timeoutMs = 90_000) {
@@ -77,6 +80,9 @@ if (!ready) {
   if (addresses.length === 0) {
     console.log(" no LAN IPv4 address found (are you on Wi-Fi?) — a tunnel such as");
     console.log(" `npx localtunnel --port 3000` will also work, HTTPS included.");
+  } else if (addresses.every((a) => a.virtual)) {
+    console.log(" only VPN/VM adapters found. Run `ipconfig` (Windows) or `ipconfig getifaddr en0`");
+    console.log(" (macOS) to find the Wi-Fi address, then open http://<that-ip>:" + port + " on the phone.");
   }
   for (const { name, address, virtual } of addresses) {
     const url = `http://${address}:${port}`;
