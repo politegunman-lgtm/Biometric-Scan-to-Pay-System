@@ -13,16 +13,28 @@ import QR from "qrcode";
 const port = Number(process.env.PORT ?? 3000);
 const local = `http://127.0.0.1:${port}`;
 
-function lanAddresses(): string[] {
-  return (
-    Object.values(os.networkInterfaces())
-      .flat()
-      .filter((i): i is os.NetworkInterfaceInfo => Boolean(i) && i!.family === "IPv4" && !i!.internal)
+/** Adapters that look like LAN but are not reachable from a phone. */
+const VIRTUAL_INTERFACE = /^(utun|tun|tap|wg|ipsec|vmnet|vboxnet|docker|br-|veth|virbr|zt|tailscale|ppp|vEthernet|Hyper-V)/i;
+
+interface Lan {
+  name: string;
+  address: string;
+  virtual: boolean;
+}
+
+function lanAddresses(): Lan[] {
+  const out: Lan[] = [];
+  for (const [name, infos] of Object.entries(os.networkInterfaces())) {
+    for (const info of infos ?? []) {
+      if (info.family !== "IPv4" || info.internal) continue;
       // 169.254.x.x is link-local (no router): a phone on the same Wi-Fi cannot
       // reach it, so never offer it as the "open this on your phone" address.
-      .filter((i) => !i.address.startsWith("169.254."))
-      .map((i) => i.address)
-  );
+      if (info.address.startsWith("169.254.")) continue;
+      out.push({ name, address: info.address, virtual: VIRTUAL_INTERFACE.test(name) });
+    }
+  }
+  // Real Wi-Fi/Ethernet first, VPN/VM adapters last.
+  return out.sort((a, b) => Number(a.virtual) - Number(b.virtual));
 }
 
 async function waitForServer(timeoutMs = 90_000) {
@@ -66,9 +78,10 @@ if (!ready) {
     console.log(" no LAN IPv4 address found (are you on Wi-Fi?) — a tunnel such as");
     console.log(" `npx localtunnel --port 3000` will also work, HTTPS included.");
   }
-  for (const address of addresses) {
+  for (const { name, address, virtual } of addresses) {
     const url = `http://${address}:${port}`;
-    console.log(` phone:          ${url}`);
+    console.log(` phone:          ${url}   [${name}]${virtual ? "  ← VPN/VM adapter, phones usually cannot reach this" : ""}`);
+    if (virtual) continue;
     try {
       const qr = await QR.toString(url, { type: "terminal", small: true, margin: 1 });
       console.log(qr);
@@ -77,6 +90,8 @@ if (!ready) {
     }
   }
   console.log(" Scan the square above with the camera, or type the URL.");
+  console.log(" Phone still can't connect? Same Wi-Fi, firewall allows Node, and no");
+  console.log(" router client-isolation. As a last resort: npx localtunnel --port " + port);
   console.log(" Demo PIN 2580 · reset data any time with POST /api/demo");
   console.log("────────────────────────────────────────────────────────\n");
 }
