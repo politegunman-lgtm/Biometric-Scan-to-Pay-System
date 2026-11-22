@@ -9,6 +9,12 @@ export const metadata: Metadata = {
   description:
     "One-tap biometric payments for MTN MoMo and African mobile money: offline vouchers, explainable fraud detection and a cloud-synced history.",
   applicationName: "Scan to Pay",
+  appleWebApp: {
+    capable: true,
+    title: "Scan to Pay",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: { telephone: false, email: false, address: false },
 };
 
 export const viewport: Viewport = {

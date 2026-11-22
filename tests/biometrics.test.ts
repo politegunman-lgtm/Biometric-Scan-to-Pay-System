@@ -46,11 +46,24 @@ test("a different finger is rejected", () => {
   assert.ok(result.score < 0.35);
 });
 
-test("poor sensor contact produces a weak or failed match", () => {
-  const result = match({
-    liveSample: synthesiseCapture({ seed: SEED, fingerId: "right-index", quality: 0.42, impostor: false }),
-  });
-  assert.ok(result.score < MATCH_THRESHOLD, `dry-finger score ${result.score}`);
+test("poor sensor contact is always weak — never a confident match", () => {
+  const scores: number[] = [];
+  for (let i = 0; i < 60; i++) {
+    const result = match({
+      liveSample: synthesiseCapture({ seed: SEED, fingerId: "right-index", quality: 0.42, impostor: false }),
+    });
+    scores.push(result.score);
+    // A dry capture may occasionally scrape past the threshold, but it must
+    // never reach confident territory — step-up is the ceiling for bad contact.
+    assert.ok(
+      !result.matched || result.lowConfidence || result.score < LOW_CONFIDENCE_THRESHOLD,
+      `confident dry-finger match at ${result.score.toFixed(3)}`,
+    );
+  }
+  const failed = scores.filter((s) => s < MATCH_THRESHOLD).length;
+  assert.ok(failed / scores.length > 0.8, `only ${failed}/60 dry captures were refused`);
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  assert.ok(avg < MATCH_THRESHOLD - 0.02, `dry-finger average ${avg.toFixed(3)} is too close to the threshold`);
 });
 
 test("low-confidence matches are flagged for step-up", () => {

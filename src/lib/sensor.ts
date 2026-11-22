@@ -9,15 +9,30 @@
  * are simulated.
  */
 
+import { sha256Bytes } from "./sha256";
+
 export const TEMPLATE_DIM = 128;
 export const MATCH_THRESHOLD = 0.86;
 
 const encoder = new TextEncoder();
 
+/**
+ * SHA-256 of `input`, preferring Web Crypto and falling back to the bundled
+ * implementation. The fallback matters in practice: `crypto.subtle` is absent
+ * outside a secure context, so the app would stop authorising payments when
+ * opened over plain http on a LAN address. Both paths produce identical bytes.
+ */
 async function digestBytes(input: string): Promise<Uint8Array> {
-  if (!globalThis.crypto?.subtle) throw new Error("Web Crypto unavailable");
-  const buf = await globalThis.crypto.subtle.digest("SHA-256", encoder.encode(input));
-  return new Uint8Array(buf);
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle) {
+    try {
+      const buf = await subtle.digest("SHA-256", encoder.encode(input));
+      return new Uint8Array(buf);
+    } catch {
+      /* fall through to the portable implementation */
+    }
+  }
+  return sha256Bytes(input);
 }
 
 /** Deterministic pseudo-random expansion of `sha256(seed + ":" + salt)`. */

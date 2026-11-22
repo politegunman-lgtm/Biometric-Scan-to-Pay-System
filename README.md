@@ -38,10 +38,31 @@ The demo seeds itself with 90 days of history on first request (deterministic, ~
 an operations console share the same state — open `/merchant` in a second tab to mint a QR and pay it from the app.
 
 ```bash
-npm test             # 36 unit tests: fraud rules, voucher protocol, crypto, matcher
-npm run smoke        # 23 end-to-end checks against a running dev server
+npm test             # 41 unit tests: fraud rules, voucher protocol, crypto, matcher, SHA-256 parity
+npm run smoke        # 26 end-to-end checks against a running dev server
 npm run build        # production build
 ```
+
+## Run it on your phone
+
+It is a mobile-first web app, so no app store build is required.
+
+**From this machine (LAN).** `npm run dev` already binds `0.0.0.0`. Keep the phone on the same Wi-Fi and open
+`http://<your-computer-lan-ip>:3000` — on macOS/Linux find the address with `ipconfig getifaddr en0` or
+`hostname -I`. The device frame disappears below 640 px and the bottom tab bar takes over.
+
+**Add to Home Screen.** The app ships a web manifest, an Apple touch icon (`apple-icon.png`) and
+`display: standalone`, so Safari → Share → *Add to Home Screen* (or Chrome → ⋮ → *Install app*) opens it fullscreen
+with a real icon and no browser chrome. `viewport-fit=cover` plus `env(safe-area-inset-*)` keep the status bar and
+the home indicator from overlapping the UI.
+
+**No HTTPS needed.** Biometric derivation needs SHA-256. `crypto.subtle` only exists in secure contexts, which would
+have broken the app on a plain-`http` LAN address, so `src/lib/sha256.ts` provides a byte-identical fallback that is
+covered by tests (`tests/parity.test.ts`). Both paths produce the same templates as the server matcher.
+
+**Deploying.** `next build && npm start` works on any Node host, but `data/store.json` is a local file: on a serverless
+platform (Vercel, Netlify) the filesystem is ephemeral, so persistence needs Postgres/KV first. On a VM or container
+with a mounted volume it is fine as-is.
 
 ## What is implemented
 
