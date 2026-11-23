@@ -152,6 +152,19 @@ signals are capped per family so three amount signals describing the same fact c
 `<30` allow, `30–64` step-up PIN, `65+` block, plus hard rules for impossible travel, liveness failure and above-cap
 offline vouchers.
 
+## Mobile app (Expo)
+
+A React Native client for Android lives in [`mobile/`](mobile/README.md). It talks to the same wallet service and
+uses real device biometrics (`expo-local-authentication`) and the real camera (`expo-camera`) for QR scanning, so the
+cross-device demo runs on hardware:
+
+```bash
+npm run dev:phone      # terminal 1, repo root
+cd mobile && npx expo start   # terminal 2, scan with Expo Go
+```
+
+The web app is untouched by it — the folder is a separate app that only consumes the HTTP API.
+
 ## Repository map
 
 ```

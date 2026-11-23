@@ -1,0 +1,123 @@
+import { useEffect, useState } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { defaultBase } from "../lib/api";
+import { relativeTime } from "../lib/format";
+import { useApp } from "../state";
+import { Badge, Button, Card, colors, Divider, Icon } from "../ui";
+
+export function Settings({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { base, saveBase, signOut, state, refresh } = useApp();
+  const [draft, setDraft] = useState(base);
+
+  useEffect(() => setDraft(base), [base, visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <View style={styles.sheet}>
+          <View style={styles.grabber} />
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+            <Text style={styles.title}>Settings</Text>
+
+            <Text style={styles.label}>WALLET SERVICE ADDRESS</Text>
+            <TextInput
+              style={styles.input}
+              value={draft}
+              onChangeText={setDraft}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder={defaultBase()}
+              placeholderTextColor={colors.muted}
+              keyboardType="url"
+            />
+            <Text style={styles.hint}>
+              Defaults to the computer running Metro, port 3000. Change it if the API lives elsewhere on the network.
+            </Text>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+              <Button label="Save" onPress={() => void saveBase(draft)} style={{ flex: 1 }} />
+              <Button
+                label="Reset"
+                variant="ghost"
+                onPress={() => {
+                  setDraft("");
+                  void saveBase(null);
+                }}
+                style={{ flex: 1 }}
+              />
+            </View>
+
+            <View style={{ marginTop: 18 }}>
+              <Card>
+                <View style={styles.row}>
+                  <Text style={styles.rowLabel}>Connection</Text>
+                  <Badge label={state ? "reachable" : "offline"} tone={state ? "ok" : "danger"} />
+                </View>
+                <Divider style={{ marginVertical: 10 }} />
+                <View style={styles.row}>
+                  <Text style={styles.rowLabel}>Vault last sync</Text>
+                  <Text style={styles.rowValue}>{relativeTime(state?.vault.lastSyncAt)}</Text>
+                </View>
+                <Divider style={{ marginVertical: 10 }} />
+                <View style={styles.row}>
+                  <Text style={styles.rowLabel}>Fingers enrolled</Text>
+                  <Text style={styles.rowValue}>{state?.biometric.fingers.length ?? 0}</Text>
+                </View>
+                <Divider style={{ marginVertical: 10 }} />
+                <View style={styles.row}>
+                  <Text style={styles.rowLabel}>Device</Text>
+                  <Text style={styles.rowValue}>{state?.devices.find((d) => d.trusted)?.label ?? "unknown"}</Text>
+                </View>
+              </Card>
+            </View>
+
+            <Button label="Refresh wallet" variant="soft" icon="cloud" onPress={() => void refresh()} style={{ marginTop: 14 }} />
+            <Button label="Lock app and sign out" variant="danger" icon="lock" onPress={() => void signOut()} style={{ marginTop: 8 }} />
+
+            <View style={styles.about}>
+              <Icon name="shield" size={13} color={colors.muted} />
+              <Text style={styles.aboutText}>
+                Scan to Pay · demo build. The OS prompt is real biometry; templates and vouchers are simulated by the
+                demo wallet service.
+              </Text>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.62)" },
+  sheet: {
+    backgroundColor: "#0C1015",
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderTopWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 26,
+    maxHeight: "86%",
+  },
+  grabber: { alignSelf: "center", width: 42, height: 4, borderRadius: 2, backgroundColor: colors.lineStrong, marginBottom: 16 },
+  title: { color: colors.text, fontSize: 19, fontWeight: "700", marginBottom: 16 },
+  label: { color: colors.muted, fontSize: 10, letterSpacing: 1.1, marginBottom: 7 },
+  input: {
+    height: 50,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    color: colors.text,
+    paddingHorizontal: 14,
+    fontSize: 13.5,
+  },
+  hint: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 8 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  rowLabel: { color: colors.textDim, fontSize: 12.5 },
+  rowValue: { color: colors.text, fontSize: 12.5 },
+  about: { flexDirection: "row", gap: 8, marginTop: 18 },
+  aboutText: { color: colors.muted, fontSize: 10.5, lineHeight: 15, flex: 1 },
+});
