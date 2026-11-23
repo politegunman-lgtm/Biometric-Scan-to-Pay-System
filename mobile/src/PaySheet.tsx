@@ -18,6 +18,7 @@ export function PaySheet({ target, onClose }: { target: PayTarget | null; onClos
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState(false);
   const [statusLine, setStatusLine] = useState<string | null>(null);
+  const [walletId, setWalletId] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const fired = useRef(false);
 
@@ -35,6 +36,7 @@ export function PaySheet({ target, onClose }: { target: PayTarget | null; onClos
 
   useEffect(() => {
     reset();
+    setWalletId(target?.walletId ?? state?.wallets.find((w) => w.primary)?.id ?? state?.wallets[0]?.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.requestId, target?.merchantId, target?.amountXAF]);
 
@@ -55,7 +57,7 @@ export function PaySheet({ target, onClose }: { target: PayTarget | null; onClos
         return;
       }
       setStatusLine(bio.detail);
-      const outcome = await authorize(target, {
+      const outcome = await authorize({ ...target, walletId: walletId ?? undefined }, {
         pin: opts?.pin,
         holdMs: Math.max(1000, Date.now() - started),
       });
@@ -151,6 +153,30 @@ export function PaySheet({ target, onClose }: { target: PayTarget | null; onClos
 
             {stage === "review" && (
               <>
+                <Text style={styles.payWith}>PAY WITH</Text>
+                <View style={styles.wallets}>
+                  {(state?.wallets ?? []).map((wallet) => {
+                    const active = wallet.id === walletId;
+                    return (
+                      <Pressable
+                        key={wallet.id}
+                        onPress={() => setWalletId(wallet.id)}
+                        style={[styles.wallet, active && styles.walletActive]}
+                      >
+                        <View style={[styles.walletDot, { backgroundColor: wallet.accent }]}>
+                          <Text style={styles.walletInitial}>
+                            {wallet.provider === "orange-money" ? "O" : wallet.provider === "express-union" ? "E" : "M"}
+                          </Text>
+                        </View>
+                        <View>
+                          <Text style={[styles.walletName, active && { color: colors.text }]}>{wallet.providerName}</Text>
+                          <Text style={styles.walletBalance}>{money(wallet.balanceXAF, { suffix: false })} FCFA</Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
                 <Text style={styles.instruction}>Hold to authorise with your fingerprint</Text>
                 <Pressable onPressIn={startHold} onPressOut={endHold} style={styles.hold}>
                   <View style={[styles.holdFill, { width: `${progress * 100}%` }]} />
@@ -250,7 +276,26 @@ const styles = StyleSheet.create({
   meta: { color: colors.muted, fontSize: 11.5, marginTop: 2 },
   amount: { color: colors.text, fontSize: 40, fontWeight: "700", textAlign: "center", marginTop: 20, letterSpacing: -1 },
   amountCur: { fontSize: 15, color: colors.textDim, fontWeight: "600" },
-  instruction: { color: colors.textDim, fontSize: 12.5, textAlign: "center", marginTop: 6 },
+  instruction: { color: colors.textDim, fontSize: 12.5, textAlign: "center", marginTop: 14 },
+  payWith: { color: colors.muted, fontSize: 9.5, letterSpacing: 1.2, marginTop: 20, marginBottom: 7 },
+  wallets: { flexDirection: "row", gap: 8 },
+  wallet: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  walletActive: { borderColor: "rgba(255,203,5,0.5)", backgroundColor: "rgba(255,203,5,0.08)" },
+  walletDot: { width: 18, height: 18, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  walletInitial: { color: colors.ink, fontSize: 9, fontWeight: "800" },
+  walletName: { color: colors.textDim, fontSize: 10.5, fontWeight: "600" },
+  walletBalance: { color: colors.muted, fontSize: 9.5, marginTop: 1 },
   hold: {
     marginTop: 18,
     height: 92,

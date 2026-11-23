@@ -97,6 +97,29 @@ export interface AppState {
   serverTime: string;
 }
 
+export interface Payee {
+  id: string;
+  name: string;
+  initials: string;
+  kind: "business" | "person" | "service";
+  category: string;
+  tagline: string | null;
+  logoHue: number;
+  verified: boolean;
+  code: string;
+  msisdnMasked: string;
+  onPlatform?: boolean;
+}
+
+export interface Directory {
+  ok: boolean;
+  query: string;
+  people: Payee[];
+  services: Payee[];
+  counts: { people: number; services: number };
+  me: Payee | null;
+}
+
 export interface PayOutcome {
   status: "settled" | "queued" | "challenged" | "declined" | "error";
   message: string;
@@ -111,6 +134,7 @@ export interface PayOutcome {
 
 export type PayTarget = {
   requestId?: string;
+  walletId?: string;
   merchantId?: string;
   merchantName: string;
   amountXAF: number;

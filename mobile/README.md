@@ -69,6 +69,19 @@ It mints a request, derives a capture with the same code the app uses, and pays 
 5. Step-up: pay more than the step-up threshold (default 50 000 FCFA) and the app asks for the MoMo PIN — **2580**.
 6. Settings → **Lock app and sign out** replays the sign-in flow.
 
+## Paying people and bills
+
+`Scan` has three modes:
+
+- **Scan** — camera reads shop QR codes and other people's personal codes (`/scan?to=…`), plus any open request.
+- **People** — search by name or phone number, *Find from contacts* (address book → `POST /api/directory`), and
+  **Your code**: a QR of your own link that anyone can scan to send you money.
+- **Bills** — the same directory's services: ENEO, Camwater, airtime, Canal+, supermarkets, school fees, hospital.
+
+Choosing a payee opens an amount composer; continuing mints a signed request and drops into the normal pay sheet,
+where you pick the funding wallet (**Pay with**: MTN MoMo / Orange Money / Express Union) before holding the sensor.
+Same biometrics, same fraud engine, same receipt — one path for every payment type.
+
 ## Notes and limits
 
 - **A physical device is required** for meaningful testing: simulators have no camera and only fake biometrics.

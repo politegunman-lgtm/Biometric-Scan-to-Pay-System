@@ -181,7 +181,7 @@ export function AppProvider({ children }: PropsWithChildren) {
         merchantId: target.merchantId,
         amountXAF: target.amountXAF,
         note: target.note,
-        walletId: state?.wallets[0]?.id,
+        walletId: target.walletId ?? state?.wallets[0]?.id,
         fingerId,
         sample,
         liveness: livenessProof(opts.holdMs ?? 1150, { spoof: opts.spoof }),

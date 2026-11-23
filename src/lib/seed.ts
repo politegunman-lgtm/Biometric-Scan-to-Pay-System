@@ -60,6 +60,40 @@ const MERCHANTS: Omit<Merchant, "code">[] = [
   { id: "mer_bamenda", name: "Bamenda Fresh Produce", category: "groceries", msisdn: "+237677554433", geo: BAMENDA, riskScore: 27, flagged: false, logoHue: 96, verified: true },
 ];
 
+/**
+ * Customers on the platform, for peer-to-peer transfers. They are modelled as
+ * payees so the existing authorisation, fraud and receipt pipeline applies
+ * unchanged — the only difference is that a person has no terminal and no
+ * merchant code to print.
+ */
+const PEOPLE: Omit<Merchant, "code">[] = [
+  { id: "peer_chantal", name: "Chantal Ngo Bell", category: "transfer", msisdn: "+237677452190", geo: YAOUNDE, riskScore: 3, flagged: false, logoHue: 330, verified: true, kind: "person", tagline: "Bastos · Yaoundé" },
+  { id: "peer_emmanuel", name: "Emmanuel Fotso", category: "transfer", msisdn: "+237699118842", geo: DOUALA, riskScore: 4, flagged: false, logoHue: 210, verified: true, kind: "person", tagline: "Bonapriso · Douala" },
+  { id: "peer_aicha", name: "Aicha Moussa", category: "transfer", msisdn: "+237655903317", geo: YAOUNDE, riskScore: 2, flagged: false, logoHue: 12, verified: true, kind: "person", tagline: "Mokolo · Yaoundé" },
+  { id: "peer_bruno", name: "Bruno Tchoumi", category: "transfer", msisdn: "+237677661204", geo: BAFOUSSAM, riskScore: 6, flagged: false, logoHue: 96, verified: true, kind: "person", tagline: "Bafoussam" },
+  { id: "peer_grace", name: "Grace Ekema", category: "transfer", msisdn: "+237699440128", geo: BUEA, riskScore: 2, flagged: false, logoHue: 165, verified: true, kind: "person", tagline: "Molyko · Buea" },
+  { id: "peer_samuel", name: "Samuel Njoya", category: "transfer", msisdn: "+237655229876", geo: YAOUNDE, riskScore: 7, flagged: false, logoHue: 40, verified: true, kind: "person", tagline: "Ngoa-Ekellé · Yaoundé" },
+  { id: "peer_linda", name: "Linda Mbarga", category: "transfer", msisdn: "+237677335019", geo: DOUALA, riskScore: 3, flagged: false, logoHue: 285, verified: true, kind: "person", tagline: "Akwa · Douala" },
+  { id: "peer_ibrahim", name: "Ibrahim Sali", category: "transfer", msisdn: "+237699776401", geo: BAMENDA, riskScore: 9, flagged: false, logoHue: 22, verified: true, kind: "person", tagline: "Bamenda" },
+];
+
+/**
+ * Billers and chains reachable from the in-app directory: utilities, airtime,
+ * subscriptions, supermarkets and school fees.
+ */
+const SERVICES: Omit<Merchant, "code">[] = [
+  { id: "svc_eneo", name: "ENEO Electricity", category: "utilities", msisdn: "+237655100200", geo: YAOUNDE, riskScore: 5, flagged: false, logoHue: 50, verified: true, kind: "service", tagline: "Prepaid meter top-up · bill" },
+  { id: "svc_camwater", name: "Camwater", category: "utilities", msisdn: "+237655100201", geo: YAOUNDE, riskScore: 5, flagged: false, logoHue: 190, verified: true, kind: "service", tagline: "Water bill" },
+  { id: "svc_mtn_airtime", name: "MTN Airtime", category: "telecom", msisdn: "+237677000100", geo: YAOUNDE, riskScore: 4, flagged: false, logoHue: 48, verified: true, kind: "service", tagline: "Top-up any MTN number" },
+  { id: "svc_orange_airtime", name: "Orange Airtime", category: "telecom", msisdn: "+237699000200", geo: DOUALA, riskScore: 4, flagged: false, logoHue: 24, verified: true, kind: "service", tagline: "Top-up any Orange number" },
+  { id: "svc_canalplus", name: "Canal+ Cameroon", category: "entertainment", msisdn: "+237699330044", geo: DOUALA, riskScore: 8, flagged: false, logoHue: 220, verified: true, kind: "service", tagline: "Subscription renewal" },
+  { id: "svc_superu", name: "Super U Yaoundé", category: "groceries", msisdn: "+237677220011", geo: YAOUNDE, riskScore: 10, flagged: false, logoHue: 110, verified: true, kind: "service", tagline: "In-store checkout" },
+  { id: "svc_mahima", name: "Mahima Supermarket", category: "groceries", msisdn: "+237699551177", geo: YAOUNDE, riskScore: 9, flagged: false, logoHue: 60, verified: true, kind: "service", tagline: "In-store checkout" },
+  { id: "svc_lycee", name: "Lycée Leclerc", category: "education", msisdn: "+237655440099", geo: YAOUNDE, riskScore: 6, flagged: false, logoHue: 250, verified: true, kind: "service", tagline: "School fees · term 2" },
+  { id: "svc_hopital", name: "Hôpital Central", category: "health", msisdn: "+237677660088", geo: YAOUNDE, riskScore: 6, flagged: false, logoHue: 160, verified: true, kind: "service", tagline: "Consultation & pharmacy" },
+  { id: "svc_sonara", name: "Tradex Fuel", category: "transport", msisdn: "+237699880055", geo: DOUALA, riskScore: 12, flagged: false, logoHue: 200, verified: true, kind: "service", tagline: "Fuel station" },
+];
+
 const CATEGORY_TICKET: Record<MerchantCategory, [number, number]> = {
   groceries: [1800, 16000],
   "food-drink": [900, 9000],
@@ -71,6 +105,7 @@ const CATEGORY_TICKET: Record<MerchantCategory, [number, number]> = {
   entertainment: [1500, 12000],
   travel: [8000, 65000],
   education: [5000, 45000],
+  transfer: [2000, 50000],
 };
 
 function codeFor(id: string) {
@@ -233,7 +268,11 @@ export function buildSeed(): Database {
   devices[2].lastSeenAt = new Date(Date.now() - 1000 * 60 * 60 * 24 * 41).toISOString();
 
   /* ---------------- merchants ---------------- */
-  const merchants: Merchant[] = MERCHANTS.map((m) => ({ ...m, code: codeFor(m.id) }));
+  const merchants: Merchant[] = [
+    ...MERCHANTS.map((m) => ({ ...m, kind: m.kind ?? ("business" as const), code: codeFor(m.id) })),
+    ...PEOPLE.map((m) => ({ ...m, code: codeFor(m.id) })),
+    ...SERVICES.map((m) => ({ ...m, code: codeFor(m.id) })),
+  ];
 
   /* ---------------- transactions ---------------- */
   const txns: Txn[] = [];

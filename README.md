@@ -84,8 +84,9 @@ with a mounted volume it is fine as-is.
 | Cloud-synced history dashboard | Encrypted vault metadata, 7/30/90-day spend analysis, category donut, merchant concentration, offline share, fraud prevented, search/filter and CSV export. |
 | Low-network fallback protocols | 4G → 3G (gzip delta) → EDGE (micro-batches + exponential backoff) → no data (vouchers + SMS), all driven by a live radio simulator. |
 
-Extras: merchant terminal with signed QR requests, audit trail, device trust/revocation, step-up PIN (scrypt), alert review
-loop, fraud-scenario sandbox, and an in-app architecture document at `/docs`.
+Extras: merchant terminal with signed QR requests, a payee directory (shops, billers, people), person-to-person transfers
+with your own QR, contact discovery, provider choice at payment time, audit trail, device trust/revocation, step-up PIN
+(scrypt), alert review loop, fraud-scenario sandbox, and an in-app architecture document at `/docs`.
 
 ## Five-minute demo script
 
@@ -100,7 +101,26 @@ loop, fraud-scenario sandbox, and an in-app architecture document at `/docs`.
 | 6 | Ops console → radio **No data** → pay twice | Vouchers queued, SMS tokens generated, balance untouched. |
 | 7 | Radio back to **3G** → **Settle**, then **Replay drill** | Batch settles; replaying a consumed counter is rejected with no funds moved. |
 | 8 | Activity | 7/30/90-day analysis, offline filter, CSV export. |
-| 9 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
+| 9 | App → **Scan → People** → search "Chantal" → amount → hold | Money moves to a person, through the same biometric + risk + receipt path as a shop payment. |
+| 10 | App → **Scan → Bills** → ENEO → amount | Billers and supermarkets are ordinary payees: same authorisation, different category. |
+| 11 | **People → Your code** → scan it from another phone | Their camera opens `/scan?to=…` with your name pre-filled; they choose the amount. |
+| 12 | **People → Find from contacts** | Matches your address book against registered numbers; only masked numbers are ever returned. |
+| 13 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
+
+### Payees, billers and people
+
+Every payee is a merchant record with a `kind` — `business`, `service` (utility, airtime, school, hospital) or `person`.
+A transfer therefore goes through exactly the same pipeline as a shop payment: park/mint a signed request
+(`POST /api/merchant`) → biometric capture → fraud scoring → receipt. There is no second payment path to secure.
+
+Provider choice happens on the pay sheet, before the hold: any active wallet (MTN MoMo, Orange Money, Express Union)
+can fund the payment, and the ledger records which one did. The `transfer` category carries a deliberately high
+P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, while velocity and velocity caps still bite.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/directory?q=` | People + services, phone numbers masked (`+237 6•• ••• 190`), plus your own entry. |
+| `POST /api/directory {numbers[]}` | Contact matching: exact/`endsWith` comparison on normalised digits, never a wildcard dump. |
 
 ### Why sign in at all, if the fingerprint already authorises payments?
 

@@ -24,6 +24,7 @@ export const CATEGORY_META: Record<MerchantCategory, { label: string; color: str
   entertainment: { label: "Leisure", color: "#FF8F6B", glyph: "ticket" },
   travel: { label: "Travel", color: "#7FD1C1", glyph: "compass" },
   education: { label: "Education", color: "#A9C0FF", glyph: "book" },
+  transfer: { label: "Send money", color: "#C9A7FF", glyph: "send" },
 };
 
 export const STATUS_META: Record<TxnStatus, { label: string; tone: string }> = {

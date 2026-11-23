@@ -34,7 +34,9 @@ type IconName =
   | "cloud"
   | "gear"
   | "lock"
-  | "wallet";
+  | "wallet"
+  | "send"
+  | "search";
 
 export function Icon({ name, size = 20, color = colors.text }: { name: IconName; size?: number; color?: string }) {
   const props = { stroke: color, strokeWidth: 1.7, fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -95,6 +97,18 @@ export function Icon({ name, size = 20, color = colors.text }: { name: IconName;
         <>
           <Rect x="5" y="10" width="14" height="10" rx="2.5" {...props} />
           <Path d="M8.5 10V8a3.5 3.5 0 0 1 7 0v2" {...props} />
+        </>
+      )}
+      {name === "send" && (
+        <>
+          <Path d="m3.3 9.6 13.2-5.2-4.1 12.4-3-5.1-6.1-2.1Z" {...props} />
+          <Path d="m9.4 11.7 3.1-3.4" {...props} />
+        </>
+      )}
+      {name === "search" && (
+        <>
+          <Circle cx="10.6" cy="10.6" r="5.6" {...props} />
+          <Path d="m15 15 4.2 4.2" {...props} />
         </>
       )}
       {name === "wallet" && (

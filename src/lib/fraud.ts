@@ -141,6 +141,9 @@ export function assessRisk(input: RiskInput): RiskAssessment {
     entertainment: 12_000,
     travel: 65_000,
     education: 45_000,
+    // Person-to-person transfers are legitimately large; only the absolute
+    // amount and velocity rules should push back, not the category ceiling.
+    transfer: 150_000,
   };
   const catCeiling = CATEGORY_P95[merchant.category] ?? 25_000;
   if (amountXAF > catCeiling * 3) {

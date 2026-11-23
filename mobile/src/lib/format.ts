@@ -40,3 +40,17 @@ export function expiryLabel(iso: string): string {
   const mins = Math.ceil(ms / 60_000);
   return mins <= 1 ? "<1 min left" : `${mins} min left`;
 }
+
+export const CATEGORY_LABEL: Record<string, string> = {
+  groceries: "Groceries",
+  "food-drink": "Food",
+  transport: "Transport",
+  telecom: "Telecom",
+  utilities: "Utilities",
+  health: "Health",
+  retail: "Retail",
+  entertainment: "Leisure",
+  travel: "Travel",
+  education: "Education",
+  transfer: "Transfer",
+};

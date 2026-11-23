@@ -40,7 +40,8 @@ export type MerchantCategory =
   | "retail"
   | "entertainment"
   | "travel"
-  | "education";
+  | "education"
+  | "transfer";
 
 export interface GeoPoint {
   lat: number;
@@ -143,6 +144,15 @@ export interface Merchant {
   flagged: boolean;
   logoHue: number;
   verified: boolean;
+  /**
+   * What this payee is:
+   * - business  a shop with a terminal (default)
+   * - person    another customer, for peer-to-peer transfers
+   * - service   a biller or chain you can pay from the in-app directory
+   */
+  kind?: "business" | "person" | "service";
+  /** One-line description shown in the directory. */
+  tagline?: string;
 }
 
 export interface PaymentRequest {

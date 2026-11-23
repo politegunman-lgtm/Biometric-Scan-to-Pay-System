@@ -48,7 +48,9 @@ export default function MerchantTerminalPage() {
     };
   }, [load]);
 
-  const merchants = data?.merchants ?? state?.merchants ?? [];
+  // People are payees for transfers, not terminals — only businesses and
+  // service desks can mint a signed request here.
+  const merchants = (data?.merchants ?? state?.merchants ?? []).filter((m) => m.kind !== "person");
   const merchant = merchants.find((m) => m.id === merchantId);
   const amountNumber = Number(amount.replace(/[^\d]/g, "")) || 0;
 
