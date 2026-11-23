@@ -21,6 +21,8 @@ export interface PayeeEntry {
   verified: boolean;
   code: string;
   msisdnMasked: string;
+  /** Listed by the business itself, not yet reviewed. */
+  isNew?: boolean;
 }
 
 const digits = (value: string) => value.replace(/\D/g, "");
@@ -55,6 +57,7 @@ export function toEntry(m: Merchant): PayeeEntry {
     verified: m.verified,
     code: m.code,
     msisdnMasked: maskMsisdn(m.msisdn),
+    isNew: Boolean(m.enrolledAt),
   };
 }
 
@@ -75,9 +78,16 @@ export function payeeMatches(m: Merchant, query: string): boolean {
 }
 
 export function searchDirectory(db: Database, query: string, limit = 12) {
-  const payees = db.merchants.filter((m) => !m.flagged && (m.kind === "person" || m.kind === "service"));
+  const payees = db.merchants.filter((m) => !m.flagged);
   const people = payees.filter((m) => m.kind === "person" && payeeMatches(m, query));
-  const services = payees.filter((m) => m.kind === "service" && payeeMatches(m, query));
+  // Everything that is not a person is payable from the Bills tab: billers,
+  // banks, schools — and shops that enrolled themselves or run a terminal.
+  const services = payees
+    .filter((m) => m.kind !== "person" && payeeMatches(m, query))
+    .sort((a, b) => {
+      const rank = (m: Merchant) => (m.enrolledAt ? 1 : m.kind === "service" ? 0 : 2);
+      return rank(a) - rank(b) || a.name.localeCompare(b.name);
+    });
   return {
     people: people.slice(0, limit).map(toEntry),
     services: services.slice(0, limit).map(toEntry),

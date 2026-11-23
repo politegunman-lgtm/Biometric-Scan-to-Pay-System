@@ -61,6 +61,8 @@ interface AppContextValue {
   simulate: (scenario: string) => Promise<ScenarioResult | null>;
   resolveAlert: (alertId: string, status: FraudAlert["status"]) => Promise<void>;
   trustDevice: (deviceId: string, trusted: boolean) => Promise<void>;
+  makePrimaryWallet: (walletId: string) => Promise<void>;
+  linkWallet: (provider: string, msisdn: string) => Promise<boolean>;
   sensorSeed: string | null;
   enrollFinger: (fingerId: string, label: string) => Promise<boolean>;
   removeFinger: (fingerId: string) => Promise<void>;
@@ -297,6 +299,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [refresh, toast],
   );
 
+  const makePrimaryWallet = useCallback(
+    async (walletId: string) => {
+      setBusy("wallet");
+      try {
+        const res = await apiJson<{ message: string }>("/api/wallets", {
+          method: "POST",
+          body: JSON.stringify({ action: "primary", walletId }),
+        });
+        await refresh();
+        toast(res.message, "ok");
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Could not switch wallet", "danger");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [refresh, toast],
+  );
+
+  const linkWallet = useCallback(
+    async (provider: string, msisdn: string) => {
+      setBusy("wallet");
+      try {
+        const res = await apiJson<{ message: string }>("/api/wallets", {
+          method: "POST",
+          body: JSON.stringify({ action: "link", provider, msisdn }),
+        });
+        await refresh();
+        toast(res.message, "ok");
+        return true;
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Could not link that wallet", "danger");
+        return false;
+      } finally {
+        setBusy(null);
+      }
+    },
+    [refresh, toast],
+  );
+
   const enrollFinger = useCallback(
     async (fingerId: string, label: string) => {
       if (!sensorSeed) {
@@ -437,6 +479,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     simulate,
     resolveAlert,
     trustDevice,
+    makePrimaryWallet,
+    linkWallet,
     sensorSeed,
     enrollFinger,
     removeFinger,

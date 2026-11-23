@@ -92,6 +92,9 @@ const SERVICES: Omit<Merchant, "code">[] = [
   { id: "svc_lycee", name: "Lycée Leclerc", category: "education", msisdn: "+237655440099", geo: YAOUNDE, riskScore: 6, flagged: false, logoHue: 250, verified: true, kind: "service", tagline: "School fees · term 2" },
   { id: "svc_hopital", name: "Hôpital Central", category: "health", msisdn: "+237677660088", geo: YAOUNDE, riskScore: 6, flagged: false, logoHue: 160, verified: true, kind: "service", tagline: "Consultation & pharmacy" },
   { id: "svc_sonara", name: "Tradex Fuel", category: "transport", msisdn: "+237699880055", geo: DOUALA, riskScore: 12, flagged: false, logoHue: 200, verified: true, kind: "service", tagline: "Fuel station" },
+  { id: "svc_afriland", name: "Afriland First Bank", category: "banking", msisdn: "+237655770010", geo: YAOUNDE, riskScore: 4, flagged: false, logoHue: 210, verified: true, kind: "service", tagline: "Account deposit · transfer" },
+  { id: "svc_ecobank", name: "Ecobank Cameroon", category: "banking", msisdn: "+237677990020", geo: DOUALA, riskScore: 5, flagged: false, logoHue: 170, verified: true, kind: "service", tagline: "Account deposit · transfer" },
+  { id: "svc_uy1", name: "Université de Yaoundé I", category: "education", msisdn: "+237699120030", geo: YAOUNDE, riskScore: 7, flagged: false, logoHue: 265, verified: true, kind: "service", tagline: "Tuition · registration fees" },
 ];
 
 const CATEGORY_TICKET: Record<MerchantCategory, [number, number]> = {
@@ -105,6 +108,7 @@ const CATEGORY_TICKET: Record<MerchantCategory, [number, number]> = {
   entertainment: [1500, 12000],
   travel: [8000, 65000],
   education: [5000, 45000],
+  banking: [10_000, 400_000],
   transfer: [2000, 50000],
 };
 

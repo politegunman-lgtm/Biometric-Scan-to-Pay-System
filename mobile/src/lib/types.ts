@@ -9,6 +9,11 @@ export interface Wallet {
   accent: string;
   primary?: boolean;
   offlineFloatXAF?: number;
+  status?: "active" | "restricted" | "frozen";
+  perTxnLimitXAF?: number;
+  dailyLimitXAF?: number;
+  holder?: string;
+  currency?: "XAF";
 }
 
 export interface Settings {
@@ -46,13 +51,22 @@ export interface PaymentRequest {
 export interface Txn {
   id: string;
   ref: string;
+  merchantId: string;
   merchantName: string;
+  merchantCode: string;
   amountXAF: number;
+  feeXAF?: number;
   status: "settled" | "queued" | "declined" | "reversed";
   createdAt: string;
   category: string;
   offline?: boolean;
   receiptNo?: string;
+  channel?: string;
+  provider?: string;
+  walletId?: string;
+  note?: string;
+  auth?: { matchScore: number; livenessScore?: number; method?: string };
+  risk?: { score: number; decision: string; level?: string };
 }
 
 export interface RiskAssessment {

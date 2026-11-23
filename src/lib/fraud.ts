@@ -144,6 +144,9 @@ export function assessRisk(input: RiskInput): RiskAssessment {
     // Person-to-person transfers are legitimately large; only the absolute
     // amount and velocity rules should push back, not the category ceiling.
     transfer: 150_000,
+  // Bank transfers and school fees are large by nature; the amount rule must not
+  // turn a tuition payment into a fraud case.
+  banking: 400_000,
   };
   const catCeiling = CATEGORY_P95[merchant.category] ?? 25_000;
   if (amountXAF > catCeiling * 3) {

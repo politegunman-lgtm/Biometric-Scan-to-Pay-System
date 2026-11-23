@@ -36,7 +36,10 @@ type IconName =
   | "lock"
   | "wallet"
   | "send"
-  | "search";
+  | "search"
+  | "store"
+  | "plus"
+  | "download";
 
 export function Icon({ name, size = 20, color = colors.text }: { name: IconName; size?: number; color?: string }) {
   const props = { stroke: color, strokeWidth: 1.7, fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -109,6 +112,21 @@ export function Icon({ name, size = 20, color = colors.text }: { name: IconName;
         <>
           <Circle cx="10.6" cy="10.6" r="5.6" {...props} />
           <Path d="m15 15 4.2 4.2" {...props} />
+        </>
+      )}
+      {name === "store" && (
+        <>
+          <Path d="M4 9.5 5.6 5h12.8L20 9.5" {...props} />
+          <Path d="M4.6 9.5v9.2a1 1 0 0 0 1 1h12.8a1 1 0 0 0 1-1V9.5" {...props} />
+          <Path d="M9.6 19.7v-4.6h4.8v4.6" {...props} />
+        </>
+      )}
+      {name === "plus" && <Path d="M12 5v14M5 12h14" {...props} />}
+      {name === "download" && (
+        <>
+          <Path d="M12 4v10" {...props} />
+          <Path d="m8 10.5 4 4 4-4" {...props} />
+          <Path d="M5 18.5h14" {...props} />
         </>
       )}
       {name === "wallet" && (

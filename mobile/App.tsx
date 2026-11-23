@@ -7,6 +7,7 @@ import { Home } from "./src/screens/Home";
 import { Scan } from "./src/screens/Scan";
 import { Settings } from "./src/screens/Settings";
 import { SignIn } from "./src/screens/SignIn";
+import { WalletScreen } from "./src/screens/Wallet";
 import type { PayTarget } from "./src/lib/types";
 import { AppProvider, useApp } from "./src/state";
 import { Button, colors, Icon } from "./src/ui";
@@ -18,6 +19,8 @@ function Shell() {
   const [tab, setTab] = useState<Tab>("home");
   const [target, setTarget] = useState<PayTarget | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [scanMode, setScanMode] = useState<"scan" | "people" | "bills">("scan");
 
   /* Retry once when the first load fails, so a sleeping dev server recovers. */
   useEffect(() => {
@@ -52,7 +55,9 @@ function Shell() {
       </View>
 
       <View style={{ flex: 1 }}>
-        {!state && error ? (
+        {walletOpen && state ? (
+          <WalletScreen onClose={() => setWalletOpen(false)} />
+        ) : !state && error ? (
           <View style={styles.center}>
             <Text style={styles.errorTitle}>Wallet service unreachable</Text>
             <Text style={styles.errorBody}>{error}</Text>
@@ -67,14 +72,23 @@ function Shell() {
             <Text style={styles.loadingText}>Verifying device key and syncing the ledger…</Text>
           </View>
         ) : tab === "home" ? (
-          <Home onPay={setTarget} onScan={() => setTab("scan")} />
+          <Home
+            onPay={setTarget}
+            onScan={() => setTab("scan")}
+            onWallets={() => setWalletOpen(true)}
+            onQuick={(mode) => {
+              setScanMode(mode);
+              setTab("scan");
+            }}
+          />
         ) : tab === "scan" ? (
-          <Scan onPay={setTarget} />
+          <Scan onPay={setTarget} initialMode={scanMode} />
         ) : (
-          <Activity />
+          <Activity onPay={setTarget} />
         )}
       </View>
 
+      {!walletOpen && (
       <View style={styles.tabs}>
         {(
           [
@@ -92,6 +106,7 @@ function Shell() {
           );
         })}
       </View>
+      )}
 
       <PaySheet
         target={target}

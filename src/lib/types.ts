@@ -41,6 +41,7 @@ export type MerchantCategory =
   | "entertainment"
   | "travel"
   | "education"
+  | "banking"
   | "transfer";
 
 export interface GeoPoint {
@@ -153,6 +154,10 @@ export interface Merchant {
   kind?: "business" | "person" | "service";
   /** One-line description shown in the directory. */
   tagline?: string;
+  /** Set when the business self-enrolled from /join — shown as "new" until reviewed. */
+  enrolledAt?: string;
+  /** Contact number given at enrolment (the paying customer never sees it unmasked). */
+  ownerMsisdn?: string;
 }
 
 export interface PaymentRequest {

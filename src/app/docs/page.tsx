@@ -16,7 +16,10 @@ const API_ROWS: [string, string, string][] = [
   ["PATCH /api/fraud", "Alert review", "Resolve or dismiss an alert (the label feeds weight tuning)."],
   ["POST /api/settings", "Policy", "Step-up threshold, offline caps, liveness, SMS fallback."],
   ["POST /api/devices", "Trust", "Trust or revoke a paired device; revocation invalidates its vouchers."],
-  ["GET /api/export", "Ledger", "CSV of the full transaction history with risk + auth metadata."],
+  ["GET /api/export", "Ledger", "CSV of the full transaction history with risk + auth metadata; `?type=recipients` aggregates who you paid."],
+  ["GET|POST /api/directory", "Payees", "Search people, billers and shops (masked numbers), or match phone contacts against registered numbers."],
+  ["POST /api/wallets", "Payment options", "Choose the default funding wallet, or link another provider account."],
+  ["GET|POST /api/enroll", "Onboarding", "A business lists itself as a payee; it becomes payable in-app immediately, pending verification."],
 ];
 
 export default function DocsPage() {

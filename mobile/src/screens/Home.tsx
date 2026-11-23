@@ -4,7 +4,19 @@ import { clockTime, expiryLabel, money, relativeTime } from "../lib/format";
 import { useApp } from "../state";
 import { Badge, Card, colors, Icon, radius, SectionHead } from "../ui";
 
-export function Home({ onPay, onScan }: { onPay: (target: PayTarget) => void; onScan: () => void }) {
+type QuickMode = "people" | "bills";
+
+export function Home({
+  onPay,
+  onScan,
+  onWallets,
+  onQuick,
+}: {
+  onPay: (target: PayTarget) => void;
+  onScan: () => void;
+  onWallets: () => void;
+  onQuick: (mode: QuickMode) => void;
+}) {
   const { state, refresh, loading } = useApp();
   if (!state) return <View style={styles.fill} />;
 
@@ -45,7 +57,11 @@ export function Home({ onPay, onScan }: { onPay: (target: PayTarget) => void; on
           </View>
           <Text style={styles.providerName}>{wallet.providerName}</Text>
           <View style={{ flex: 1 }} />
-          <Badge label="primary" tone="brand" />
+          <Badge label="default" tone="brand" />
+          <TouchableOpacity onPress={onWallets} hitSlop={10} style={styles.manage} activeOpacity={0.8}>
+            <Icon name="wallet" size={12} color={colors.textDim} />
+            <Text style={styles.manageLabel}>Wallets</Text>
+          </TouchableOpacity>
         </View>
         <Text style={styles.balanceLabel}>Available balance</Text>
         <Text style={styles.balance}>
@@ -71,6 +87,27 @@ export function Home({ onPay, onScan }: { onPay: (target: PayTarget) => void; on
             <Text style={styles.actionLabel}>Scan</Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      <View style={styles.quickRow}>
+        <TouchableOpacity style={styles.quick} activeOpacity={0.85} onPress={() => onQuick("people")}>
+          <View style={[styles.quickGlyph, { backgroundColor: "rgba(75,221,160,0.12)" }]}>
+            <Icon name="send" size={16} color={colors.mint} />
+          </View>
+          <Text style={styles.quickLabel}>Send money</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quick} activeOpacity={0.85} onPress={() => onQuick("bills")}>
+          <View style={[styles.quickGlyph, { backgroundColor: "rgba(106,166,255,0.12)" }]}>
+            <Icon name="store" size={16} color={colors.blue} />
+          </View>
+          <Text style={styles.quickLabel}>Pay a bill</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quick} activeOpacity={0.85} onPress={onWallets}>
+          <View style={[styles.quickGlyph, { backgroundColor: "rgba(255,203,5,0.12)" }]}>
+            <Icon name="wallet" size={16} color={colors.brand} />
+          </View>
+          <Text style={styles.quickLabel}>Wallets</Text>
+        </TouchableOpacity>
       </View>
 
       {pending.length > 0 && (
@@ -172,6 +209,20 @@ const styles = StyleSheet.create({
   providerLogo: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   providerInitial: { color: colors.ink, fontSize: 12, fontWeight: "800" },
   providerName: { color: colors.text, fontSize: 13, fontWeight: "600" },
+  manage: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.07)" },
+  manageLabel: { color: colors.textDim, fontSize: 10, fontWeight: "600" },
+  quickRow: { flexDirection: "row", gap: 9, marginTop: 2 },
+  quick: {
+    flex: 1,
+    gap: 9,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  quickGlyph: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  quickLabel: { color: colors.text, fontSize: 11.5, fontWeight: "600" },
   balanceLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11, letterSpacing: 0.4 },
   balance: { color: colors.text, fontSize: 34, fontWeight: "700", letterSpacing: -0.5, marginTop: 2 },
   balanceCur: { fontSize: 14, fontWeight: "600", color: "rgba(255,255,255,0.6)" },

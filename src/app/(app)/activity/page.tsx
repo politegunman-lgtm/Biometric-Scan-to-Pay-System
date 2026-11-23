@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/components/AppProvider";
 import { TxnRow } from "@/components/TxnRow";
 import { AreaChart, Donut } from "@/components/charts";
 import { Icon } from "@/components/icons";
 import { Disclosure, EmptyState } from "@/components/controls";
 import { CATEGORY_META, dayKey, money, niceDay, relativeTime } from "@/lib/format";
-import type { MerchantCategory } from "@/lib/types";
+import { apiJson } from "@/lib/client";
+import type { MerchantCategory, Txn } from "@/lib/types";
 
 type Period = 7 | 30 | 90;
 type Filter = "all" | "offline" | "blocked" | "queued";
@@ -25,11 +26,85 @@ const FILTERS: { label: string; value: Filter }[] = [
   { label: "Queued", value: "queued" },
 ];
 
+interface Recipient {
+  merchantId: string;
+  name: string;
+  code: string;
+  category: MerchantCategory;
+  kind: string;
+  payments: number;
+  spentXAF: number;
+  lastPaidAt: string;
+  lastAmountXAF: number;
+}
+
 export default function ActivityPage() {
-  const { state, sync, busy } = useApp();
+  const { state, sync, busy, openPay, toast } = useApp();
   const [period, setPeriod] = useState<Period>(30);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<"payments" | "recipients">("payments");
+
+  // /activity?view=recipients (from the wallet page) opens the recipients tab.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("view") === "recipients") setTab("recipients");
+  }, []);
+
+  /* Who you paid — the same aggregation as the recipients CSV. */
+  const recipients = useMemo<Recipient[]>(() => {
+    if (!state) return [];
+    const map = new Map<string, Recipient>();
+    for (const t of state.txns as Txn[]) {
+      if (t.status === "declined") continue;
+      const found = map.get(t.merchantId);
+      if (found) {
+        found.payments += 1;
+        if (t.status === "settled") found.spentXAF += t.amountXAF;
+        if (t.createdAt > found.lastPaidAt) {
+          found.lastPaidAt = t.createdAt;
+          found.lastAmountXAF = t.amountXAF;
+        }
+        continue;
+      }
+      map.set(t.merchantId, {
+        merchantId: t.merchantId,
+        name: t.merchantName,
+        code: t.merchantCode,
+        category: t.category,
+        kind: state.merchants.find((m) => m.id === t.merchantId)?.kind ?? "business",
+        payments: 1,
+        spentXAF: t.status === "settled" ? t.amountXAF : 0,
+        lastPaidAt: t.createdAt,
+        lastAmountXAF: t.amountXAF,
+      });
+    }
+    return [...map.values()]
+      .filter((r) => !query.trim() || r.name.toLowerCase().includes(query.trim().toLowerCase()))
+      .sort((a, b) => (a.lastPaidAt < b.lastPaidAt ? 1 : -1));
+  }, [state, query]);
+
+  /* Repeat a payment: mint a fresh signed request, then let biometrics decide. */
+  const payAgain = async (recipient: Recipient) => {
+    try {
+      const res = await apiJson<{ request: { id: string; merchantId: string; merchantName: string; merchantCode: string; amountXAF: number; note?: string; category: MerchantCategory } }>(
+        "/api/merchant",
+        { method: "POST", body: JSON.stringify({ merchantId: recipient.merchantId, amountXAF: recipient.lastAmountXAF, note: "Repeat payment" }) },
+      );
+      openPay({
+        requestId: res.request.id,
+        merchantId: res.request.merchantId,
+        merchantName: res.request.merchantName,
+        merchantCode: res.request.merchantCode,
+        amountXAF: res.request.amountXAF,
+        note: res.request.note,
+        category: res.request.category,
+        channel: "qr-scan",
+        source: "request",
+      });
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not start that payment", "danger");
+    }
+  };
 
   const view = useMemo(() => {
     if (!state) return null;
@@ -112,12 +187,90 @@ export default function ActivityPage() {
             Encrypted history mirrored to your cloud vault.
           </p>
         </div>
-        <a className="chip" href="/api/export" download>
-          <Icon name="download" size={13} />
-          CSV
-        </a>
+        <div className="row gap-6">
+          <a className="chip" href="/api/export?type=recipients" download>
+            <Icon name="download" size={13} />
+            Recipients CSV
+          </a>
+          <a className="chip" href="/api/export" download>
+            <Icon name="download" size={13} />
+            All payments
+          </a>
+        </div>
       </div>
 
+      <div className="segmented">
+        {(["payments", "recipients"] as const).map((id) => (
+          <button key={id} type="button" className={tab === id ? "active" : ""} onClick={() => setTab(id)}>
+            {id === "payments" ? "Payments" : `Recipients (${recipients.length})`}
+          </button>
+        ))}
+      </div>
+
+      {tab === "recipients" && (
+        <>
+          <div className="search">
+            <Icon name="search" size={15} />
+            <input
+              className="input"
+              placeholder="Find someone you paid…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search recipients"
+            />
+          </div>
+          {recipients.length === 0 ? (
+            <EmptyState icon={<Icon name="user" size={19} />} title="No recipients yet" body="Pay a shop, a biller or a friend and they show up here with their history." />
+          ) : (
+            <div className="stack gap-8">
+              {recipients.map((r) => (
+                <div key={r.merchantId} className="card flat" style={{ padding: 12 }}>
+                  <div className="row gap-10" style={{ alignItems: "center" }}>
+                    <span
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 10,
+                        display: "grid",
+                        placeItems: "center",
+                        background: "rgba(255,203,5,.1)",
+                        color: "var(--accent)",
+                        flex: "none",
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {r.name.slice(0, 1)}
+                    </span>
+                    <span className="grow" style={{ minWidth: 0 }}>
+                      <span className="truncate" style={{ display: "block", fontSize: 12.5, fontWeight: 500 }}>
+                        {r.name}
+                      </span>
+                      <span className="tiny muted">
+                        {CATEGORY_META[r.category].label} · code {r.code} · {r.payments}× · last {relativeTime(r.lastPaidAt)}
+                      </span>
+                    </span>
+                    <span style={{ textAlign: "right" }}>
+                      <span className="num" style={{ display: "block", fontSize: 12.5 }}>{money(r.spentXAF, { suffix: false })}</span>
+                      <span className="tiny muted">FCFA paid</span>
+                    </span>
+                    <button className="btn soft xs" type="button" onClick={() => void payAgain(r)}>
+                      Pay {money(r.lastAmountXAF, { suffix: false })}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <a className="btn ghost sm" href="/api/export?type=recipients" download>
+                <Icon name="download" size={13} />
+                Download these recipients (CSV)
+              </a>
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === "payments" && (
+      <>
       <div className="card flat" style={{ padding: "10px 12px", display: "flex", alignItems: "center", gap: 9 }}>
         <span
           style={{
@@ -298,6 +451,8 @@ export default function ActivityPage() {
             </div>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

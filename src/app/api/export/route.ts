@@ -1,11 +1,29 @@
 import { readDb } from "@/lib/store";
+import { recipientsCsv, recipientsOf } from "@/lib/accounts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/export — CSV ledger for the end user's own financial management. */
-export function GET() {
+/**
+ * GET /api/export — CSV for the end user's own records.
+ *   ?type=ledger      every payment (default)
+ *   ?type=recipients  who you paid, how often and how much
+ */
+export function GET(req: Request) {
   const db = readDb();
+  const dataset = new URL(req.url).searchParams.get("type") ?? "ledger";
+
+  if (dataset === "recipients") {
+    const csv = recipientsCsv(recipientsOf(db));
+    return new Response(csv, {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="scan-to-pay-recipients-${new Date().toISOString().slice(0, 10)}.csv"`,
+        "cache-control": "no-store",
+      },
+    });
+  }
+
   const header = [
     "receipt",
     "created_at",

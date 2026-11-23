@@ -2199,3 +2199,8 @@ input[type="range"]::-moz-range-thumb {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Business enrolment page: one column on small screens. */
+@media (max-width: 900px) {
+  .join-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}

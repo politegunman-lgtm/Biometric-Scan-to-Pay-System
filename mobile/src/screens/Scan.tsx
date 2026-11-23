@@ -52,9 +52,15 @@ function Avatar({ name, hue }: { name: string; hue: number }) {
   );
 }
 
-export function Scan({ onPay }: { onPay: (target: PayTarget) => void }) {
+export function Scan({
+  onPay,
+  initialMode = "scan",
+}: {
+  onPay: (target: PayTarget) => void;
+  initialMode?: Mode;
+}) {
   const { state, refresh, base } = useApp();
-  const [mode, setMode] = useState<Mode>("scan");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [query, setQuery] = useState("");
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [composer, setComposer] = useState<Payee | null>(null);
@@ -81,6 +87,11 @@ export function Scan({ onPay }: { onPay: (target: PayTarget) => void }) {
     const id = setTimeout(() => void load(query), query ? 250 : 0);
     return () => clearTimeout(id);
   }, [query, load]);
+
+  /* Home quick actions land here with a mode already chosen. */
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   const openRequests = state?.requests.filter((r) => r.status === "open") ?? [];
 

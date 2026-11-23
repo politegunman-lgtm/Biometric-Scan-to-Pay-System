@@ -82,6 +82,17 @@ Choosing a payee opens an amount composer; continuing mints a signed request and
 where you pick the funding wallet (**Pay with**: MTN MoMo / Orange Money / Express Union) before holding the sensor.
 Same biometrics, same fraud engine, same receipt — one path for every payment type.
 
+## Wallets, recipients and business enrolment
+
+- **Wallet screen** (tap *Wallets* on the balance card, or the third quick action) lists every linked provider account,
+  shows the default, and lets you **make another wallet the default**. It also links a new account: pick MTN MoMo, Orange
+  Money or Express Union, type the number, and it appears on the pay sheet. Sandbox accounts start with a 20 000 FCFA float.
+- **Activity** rows open a payment detail sheet: recipient, payee code, wallet, channel, biometric match, risk decision,
+  and **Pay again** for the same amount. *Export* shares a CSV of your payments through the OS share sheet (there is no
+  file-system write, so it works in Expo Go); *Share* on a receipt sends a text receipt.
+- **List my business** (Wallet screen) opens the web enrolment page in the browser; the listing then shows up in the app's
+  *Bills* tab, payable with a fingerprint. Enrollment itself stays web-side because it is a one-off onboarding form.
+
 ## Notes and limits
 
 - **A physical device is required** for meaningful testing: simulators have no camera and only fake biometrics.

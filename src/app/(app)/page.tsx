@@ -155,6 +155,18 @@ export default function HomePage() {
           </span>
           <span className="label">Scan QR</span>
         </button>
+        <button className="quick-action" type="button" onClick={() => router.push("/scan?tab=people")}>
+          <span className="glyph mint">
+            <Icon name="send" size={16} />
+          </span>
+          <span className="label">Send money</span>
+        </button>
+        <button className="quick-action" type="button" onClick={() => router.push("/scan?tab=services")}>
+          <span className="glyph blue">
+            <Icon name="bolt" size={16} />
+          </span>
+          <span className="label">Pay a bill</span>
+        </button>
         <button className="quick-action" type="button" onClick={() => void startOfflineDemo()}>
           <span className="glyph mint">
             <Icon name="cloud" size={16} />
@@ -167,6 +179,12 @@ export default function HomePage() {
           </span>
           <span className="label">Merchant</span>
         </button>
+        <a className="quick-action" href="/join">
+          <span className="glyph">
+            <Icon name="plus" size={16} />
+          </span>
+          <span className="label">List a business</span>
+        </a>
       </div>
 
       <section>

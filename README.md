@@ -105,7 +105,10 @@ with your own QR, contact discovery, provider choice at payment time, audit trai
 | 10 | App → **Scan → Bills** → ENEO → amount | Billers and supermarkets are ordinary payees: same authorisation, different category. |
 | 11 | **People → Your code** → scan it from another phone | Their camera opens `/scan?to=…` with your name pre-filled; they choose the amount. |
 | 12 | **People → Find from contacts** | Matches your address book against registered numbers; only masked numbers are ever returned. |
-| 13 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
+| 12 | **Wallet → Make primary** on another provider | The default funding switches; the pay sheet opens on that wallet. **Link another account** adds a fourth wallet with a sandbox float. |
+| 13 | `/join` → list a business | It appears in the app's **Bills** tab with a `new` badge; pick it, enter an amount, authorise with a fingerprint. |
+| 14 | **Activity → Recipients** | Who you paid, how often and how much, with **Pay again** and a recipients CSV. |
+| 15 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
 
 ### Payees, billers and people
 
@@ -121,6 +124,22 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
 | --- | --- |
 | `GET /api/directory?q=` | People + services, phone numbers masked (`+237 6•• ••• 190`), plus your own entry. |
 | `POST /api/directory {numbers[]}` | Contact matching: exact/`endsWith` comparison on normalised digits, never a wildcard dump. |
+| `GET /api/wallets` · `POST /api/wallets` | Linked provider accounts; `{action:"primary"}` switches the default funding wallet, `{action:"link", provider, msisdn}` adds one. |
+| `GET /api/enroll` · `POST /api/enroll` | Business self-enrolment: types, cities and the newest listings; a valid enrolment becomes a payable payee immediately. |
+| `GET /api/export?type=ledger` · `?type=recipients` | Your payments, or an aggregated list of who you paid. |
+
+### Payment options, business enrolment and recipients
+
+- **Wallet choice.** Every payment says which wallet funds it. The default comes from `wallets[].primary`, which the
+  user can change at any time on the Wallet screen (web and Expo); the pay sheet still lets you override it per payment.
+  Switching the default moves no money — queued offline vouchers stay bound to the wallet that signed them.
+- **Self-enrolment.** A shop, utility, school, hospital, bank or telecom lists itself on `/join`: name, type, city,
+  neighbourhood and a phone number. It is written as a payee with `kind`/`category`, `enrolledAt` and `verified: false`
+  (the listing shows a `new` badge until a reviewer checks the registration). From then on it is findable in the app and
+  payable with a fingerprint — no parallel pipeline, no separate settlement path.
+- **Recipients.** Activity groups settled and queued payments per payee, so you can see who you have paid, how often and
+  in what total, **Pay again** the last amount, or download the recipients as CSV. The Expo app offers the same data in a
+  payment detail sheet with a share sheet for the CSV and for an individual receipt.
 
 ### Why sign in at all, if the fingerprint already authorises payments?
 
@@ -190,8 +209,9 @@ The web app is untouched by it — the folder is a separate app that only consum
 ```
 src/app/(app)/          phone shell: home, scan, activity, security, wallet
 src/app/merchant/       merchant terminal (signed QR requests)
+src/app/join/           business self-enrolment (list a payee)
 src/app/docs/           in-app architecture & API document
-src/app/api/            state, pay, biometric, merchant, sync, network, fraud, settings, devices, export, qr
+src/app/api/            state, pay, biometric, merchant, directory, wallets, enroll, sync, network, fraud, settings, devices, export, qr
 src/lib/biometrics.ts   matching, liveness, sensor synthesis
 src/lib/fraud.ts        scoring engine, family caps, hard rules, baseline learner
 src/lib/offline.ts      voucher protocol, settlement checks, transport ladder
@@ -199,8 +219,9 @@ src/lib/service.ts      authorisation, queueing, settlement, state projection
 src/lib/crypto.ts       AES-256-GCM seals, Ed25519, scrypt, HMAC
 src/lib/store.ts        atomic JSON persistence + seed
 src/lib/providers.ts    MTN MoMo / Orange Money / Express Union adapters
+src/lib/accounts.ts     wallet linking / default wallet, business enrolment, recipients
 src/components/         app shell, pay sheet, biometric pad, charts, risk UI
-tests/                  unit tests (fraud, offline, biometrics, crypto)
+tests/                  unit tests (fraud, offline, biometrics, crypto, accounts)
 scripts/smoke.mts       end-to-end API walkthrough
 ```
 

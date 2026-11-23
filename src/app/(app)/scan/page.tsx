@@ -20,6 +20,7 @@ interface Payee {
   verified: boolean;
   code: string;
   msisdnMasked: string;
+  isNew?: boolean;
 }
 
 interface Directory {
@@ -56,6 +57,12 @@ export default function ScanPage() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
+    // /scan?tab=people|services — the home screen's shortcut buttons land here.
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get("tab");
+    if (wanted === "people" || wanted === "services") setTab(wanted);
+    const preset = params.get("q");
+    if (preset) setQuery(preset);
   }, []);
 
   const loadDirectory = useCallback(async (q: string) => {
@@ -559,12 +566,16 @@ export default function ScanPage() {
                         {service.tagline ?? CATEGORY_META[service.category].label}
                       </span>
                     </span>
-                    <span
-                      className="badge muted"
-                      style={{ height: 18, fontSize: 9, color: CATEGORY_META[service.category].color }}
-                    >
-                      {CATEGORY_META[service.category].label}
-                    </span>
+                    {service.isNew ? (
+                      <span className="badge accent" style={{ height: 18, fontSize: 9 }}>new</span>
+                    ) : (
+                      <span
+                        className="badge muted"
+                        style={{ height: 18, fontSize: 9, color: CATEGORY_META[service.category].color }}
+                      >
+                        {CATEGORY_META[service.category].label}
+                      </span>
+                    )}
                     <Icon name="chevron" size={14} className="arrow" />
                   </button>
                 ))}

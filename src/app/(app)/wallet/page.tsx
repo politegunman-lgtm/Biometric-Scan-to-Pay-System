@@ -1,13 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useApp } from "@/components/AppProvider";
 import { QueuePanel } from "@/components/QueuePanel";
 import { Icon } from "@/components/icons";
 import { money, relativeTime } from "@/lib/format";
 
+const PROVIDERS = [
+  { id: "mtn-momo", name: "MTN Mobile Money", accent: "#FFCB05" },
+  { id: "orange-money", name: "Orange Money", accent: "#FF7900" },
+  { id: "express-union", name: "Express Union Mobile", accent: "#38BDF8" },
+];
+
 export default function WalletPage() {
-  const { state, sync, busy, trustDevice, reseedDemo, rotateSensor, toast } = useApp();
+  const { state, sync, busy, trustDevice, reseedDemo, rotateSensor, toast, makePrimaryWallet, linkWallet } = useApp();
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [provider, setProvider] = useState("mtn-momo");
+  const [msisdn, setMsisdn] = useState("");
+
   if (!state) return null;
 
   const vault = state.vault;
@@ -48,7 +59,21 @@ export default function WalletPage() {
                   <div className="tiny muted">{w.msisdn}</div>
                 </div>
               </div>
-              <span className={`badge ${w.status === "active" ? "ok" : "danger"}`}>{w.status}</span>
+              <div className="row gap-6">
+                {w.primary ? (
+                  <span className="badge accent">default</span>
+                ) : (
+                  <button
+                    className="btn ghost xs"
+                    type="button"
+                    onClick={() => void makePrimaryWallet(w.id)}
+                    disabled={busy === "wallet" || w.status !== "active"}
+                  >
+                    Make primary
+                  </button>
+                )}
+                <span className={`badge ${w.status === "active" ? "ok" : "danger"}`}>{w.status}</span>
+              </div>
             </div>
             <div className="row-between" style={{ marginTop: 12, alignItems: "flex-end" }}>
               <div>
@@ -77,6 +102,65 @@ export default function WalletPage() {
           </div>
         ))}
       </div>
+
+      <section className="card flat">
+        <div className="section-head" style={{ marginBottom: 6 }}>
+          <h2 style={{ fontSize: 13.5 }}>Payment options</h2>
+          <span className="badge muted">{state.wallets.length} linked</span>
+        </div>
+        <p className="tiny muted" style={{ marginBottom: 10, lineHeight: 1.5 }}>
+          The default wallet funds every payment unless you pick another one on the pay sheet. Linking a number here creates a
+          sandbox account with a 20 000 FCFA float so you can try it.
+        </p>
+        {!linkOpen ? (
+          <button className="btn ghost sm" type="button" style={{ justifyContent: "flex-start" }} onClick={() => setLinkOpen(true)}>
+            <Icon name="plus" size={14} />
+            Link another mobile-money account
+          </button>
+        ) : (
+          <div className="stack gap-10">
+            <div className="field">
+              <label htmlFor="provider">Provider</label>
+              <select id="provider" className="select" value={provider} onChange={(e) => setProvider(e.target.value)}>
+                {PROVIDERS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="wallet-msisdn">Number</label>
+              <input
+                id="wallet-msisdn"
+                className="input"
+                inputMode="tel"
+                placeholder="6 55 77 88 99"
+                value={msisdn}
+                onChange={(e) => setMsisdn(e.target.value)}
+              />
+            </div>
+            <div className="btn-row">
+              <button
+                className="btn primary sm"
+                type="button"
+                disabled={busy === "wallet" || msisdn.replace(/\D/g, "").length < 8}
+                onClick={async () => {
+                  const ok = await linkWallet(provider, msisdn);
+                  if (ok) {
+                    setMsisdn("");
+                    setLinkOpen(false);
+                  }
+                }}
+              >
+                <Icon name="plus" size={13} />
+                Link wallet
+              </button>
+              <button className="btn ghost sm" type="button" onClick={() => setLinkOpen(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
 
       <section className="card flat">
         <div className="section-head" style={{ marginBottom: 4 }}>
@@ -205,6 +289,10 @@ export default function WalletPage() {
           <Link href="/security" className="btn ghost sm" style={{ justifyContent: "flex-start" }}>
             <Icon name="shield" size={14} />
             Security &amp; biometrics
+          </Link>
+          <Link href="/activity?view=recipients" className="btn ghost sm" style={{ justifyContent: "flex-start" }}>
+            <Icon name="user" size={14} />
+            Recipients &amp; downloads
           </Link>
           <Link href="/merchant" className="btn ghost sm" style={{ justifyContent: "flex-start" }}>
             <Icon name="store" size={14} />
