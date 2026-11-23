@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useApp } from "./AppProvider";
+import { LoginScreen, SESSION_KEY } from "./LoginScreen";
 import { BottomNav } from "./BottomNav";
 import { PaySheet } from "./PaySheet";
 import { SideRail } from "./SideRail";
@@ -58,6 +60,53 @@ function BootScreen({ error, onRetry }: { error: string | null; onRetry: () => v
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const { state, error, refresh } = useApp();
+  const [locked, setLocked] = useState<boolean | null>(null);
+
+  /* Session is per browser, stored locally — reopening skips the OTP. */
+  useEffect(() => {
+    try {
+      setLocked(localStorage.getItem(SESSION_KEY) !== "1");
+    } catch {
+      setLocked(false);
+    }
+  }, []);
+
+  /* Until we know whether a session exists, show a neutral splash: rendering
+     * the wallet first would flash real balances before the sign-in screen. */
+  if (locked === null) {
+    return (
+      <div className="app">
+        <div className="shell" style={{ gridTemplateColumns: "minmax(0, 440px)" }}>
+          <div className="device-wrap">
+            <div className="device">
+              <div className="screen" style={{ display: "grid", placeItems: "center" }}>
+                <span className="login-mark" style={{ animation: "pulse 1.6s ease-in-out infinite" }}>
+                  <Icon name="fingerprint" size={22} />
+                </span>
+                <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.06);opacity:1}}`}</style>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (locked) {
+    return (
+      <div className="app">
+        <div className="shell" style={{ gridTemplateColumns: "minmax(0, 440px)" }}>
+          <div className="device-wrap">
+            <div className="device">
+              <div className="screen">
+                <LoginScreen onDone={() => setLocked(false)} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">

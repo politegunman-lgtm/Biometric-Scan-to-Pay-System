@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/components/AppProvider";
 import { MerchantAvatar } from "@/components/MerchantAvatar";
 import { Icon } from "@/components/icons";
@@ -15,6 +15,41 @@ export default function ScanPage() {
   const [detected, setDetected] = useState<PaymentRequest | null>(null);
   const [merchantId, setMerchantId] = useState("");
   const [amount, setAmount] = useState("");
+  const deepLinkHandled = useRef(false);
+
+  /*
+   * Merchant QR codes encode /scan?req=<id>. Scanning one with the phone
+   * camera lands here: open the sheet for that exact request instead of
+   * making the customer hunt for it in the list.
+   */
+  useEffect(() => {
+    if (deepLinkHandled.current || !state) return;
+    const id = new URLSearchParams(window.location.search).get("req");
+    if (!id) return;
+    deepLinkHandled.current = true;
+    window.history.replaceState({}, "", "/scan");
+    const request = state.requests.find((r) => r.id === id);
+    if (!request) {
+      toast("That payment link is not valid any more", "danger");
+      return;
+    }
+    if (request.status !== "open") {
+      toast(`Request ${request.ref} is already ${request.status}`, "warn");
+      void refresh();
+      return;
+    }
+    openPay({
+      requestId: request.id,
+      merchantId: request.merchantId,
+      merchantName: request.merchantName,
+      merchantCode: request.merchantCode,
+      amountXAF: request.amountXAF,
+      note: request.note,
+      category: request.category,
+      channel: "qr-scan",
+      source: "request",
+    });
+  }, [state, openPay, toast, refresh]);
 
   if (!state) return null;
   const requests = state.requests.filter((r) => r.status === "open");

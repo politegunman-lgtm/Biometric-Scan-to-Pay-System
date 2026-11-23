@@ -154,21 +154,18 @@ export default function HomePage() {
             <Icon name="qr" size={16} />
           </span>
           <span className="label">Scan QR</span>
-          <span className="sub">Merchant code</span>
         </button>
         <button className="quick-action" type="button" onClick={() => void startOfflineDemo()}>
           <span className="glyph mint">
             <Icon name="cloud" size={16} />
           </span>
-          <span className="label">Offline test</span>
-          <span className="sub">Signed voucher</span>
+          <span className="label">Offline</span>
         </button>
         <button className="quick-action" type="button" onClick={() => router.push("/merchant")}>
           <span className="glyph blue">
             <Icon name="store" size={16} />
           </span>
           <span className="label">Merchant</span>
-          <span className="sub">Take a payment</span>
         </button>
       </div>
 
@@ -185,7 +182,7 @@ export default function HomePage() {
               No open requests. Create one in the merchant terminal, or scan any code.
             </div>
           )}
-          {requests.slice(0, 3).map((r) => {
+          {requests.slice(0, 2).map((r) => {
             const merchant = state.merchants.find((m) => m.id === r.merchantId);
             return (
               <button
@@ -231,7 +228,7 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="list">
-          {state.txns.slice(0, 5).map((txn) => (
+          {state.txns.slice(0, 4).map((txn) => (
             <TxnRow key={txn.id} txn={txn} />
           ))}
         </div>
@@ -261,8 +258,7 @@ export default function HomePage() {
             Protection active · {openAlerts === 0 ? "no open alerts" : `${openAlerts} alert${openAlerts === 1 ? "" : "s"}`}
           </span>
           <span className="tiny muted">
-            {finger?.label ?? "Fingerprint"} · liveness {state.biometric.livenessEnabled ? "on" : "off"} · step-up{" "}
-            {money(state.user.settings.stepUpThresholdXAF)}
+            {finger?.label ?? "Fingerprint"} · liveness {state.biometric.livenessEnabled ? "on" : "off"}
           </span>
         </span>
         <Icon name="chevron" size={15} style={{ color: "var(--dim)" }} />

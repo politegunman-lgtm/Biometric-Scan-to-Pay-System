@@ -39,7 +39,7 @@ an operations console share the same state — open `/merchant` in a second tab 
 
 ```bash
 npm test             # 41 unit tests: fraud rules, voucher protocol, crypto, matcher, SHA-256 parity
-npm run smoke        # 26 end-to-end checks against a running dev server
+npm run smoke        # 28 end-to-end checks against a running dev server
 npm run build        # production build
 ```
 
@@ -91,6 +91,7 @@ loop, fraud-scenario sandbox, and an in-app architecture document at `/docs`.
 
 | Step | Where | What to notice |
 | --- | --- | --- |
+| 0 | First open → sign in | Number → 6-digit code (**123456**) → enable fingerprint. Only once per browser; **Wallet → Lock app** replays it. |
 | 1 | Home → **Tap to pay** → hold the sensor | Settles in one hold; receipt shows match score, liveness and risk score. |
 | 2 | Pay sheet simulator → **Impostor finger** | Match ~0% — payment refused before the risk engine runs. |
 | 3 | Simulator → **Spoof / no pulse** | Genuine embedding, failed liveness — replay defence. |
@@ -99,7 +100,14 @@ loop, fraud-scenario sandbox, and an in-app architecture document at `/docs`.
 | 6 | Ops console → radio **No data** → pay twice | Vouchers queued, SMS tokens generated, balance untouched. |
 | 7 | Radio back to **3G** → **Settle**, then **Replay drill** | Batch settles; replaying a consumed counter is rejected with no funds moved. |
 | 8 | Activity | 7/30/90-day analysis, offline filter, CSV export. |
-| 9 | `/merchant` | Generate a signed QR, pay it from the app, watch the terminal mark it paid. |
+| 9 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
+
+### Why sign in at all, if the fingerprint already authorises payments?
+
+They answer different questions. Sign-in (number + OTP, the primitive MTN MoMo and Orange Money already use) proves *who
+holds the account* and binds this browser to it. The fingerprint authorises *each individual payment* — possession plus
+intent, per transaction. Drop sign-in and an unlocked stolen phone is a wallet; drop the fingerprint and a shoulder-surfed
+PIN is. The flow is deliberately three taps long and remembered per device, like "trust this device".
 
 Demo step-up PIN: **2580** (change it in Security). Biometrics are simulated; everything downstream of the matcher is real.
 

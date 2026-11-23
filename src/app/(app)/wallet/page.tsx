@@ -234,6 +234,22 @@ export default function WalletPage() {
             className="btn ghost sm"
             type="button"
             style={{ justifyContent: "flex-start" }}
+            onClick={() => {
+              try {
+                localStorage.removeItem("bsp.session");
+              } catch {
+                /* ignore */
+              }
+              window.location.reload();
+            }}
+          >
+            <Icon name="lock" size={14} />
+            Lock app and sign out
+          </button>
+          <button
+            className="btn ghost sm"
+            type="button"
+            style={{ justifyContent: "flex-start" }}
             onClick={() => void reseedDemo()}
             disabled={busy === "reset"}
           >

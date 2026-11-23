@@ -129,6 +129,19 @@ async function main() {
   });
   check("re-bound template authorises", out.status === "settled" || out.status === "challenged", `${out.status} ${out.message}`);
 
+  console.log("\n── Merchant deep link ──────────────────────────────────");
+  const linked = await api<any>("/api/merchant", {
+    method: "POST",
+    body: JSON.stringify({ merchantId: "mer_mfoundi", amountXAF: 2_400, note: "phone link" }),
+  });
+  const phoneUrl: string = linked.phoneUrl ?? "";
+  check(
+    "merchant request exposes a phone deep link",
+    phoneUrl.includes(`/scan?req=${linked.request?.id ?? "?"}`) && phoneUrl.startsWith("http"),
+    phoneUrl,
+  );
+  check("deep link page responds", (await fetch(`${BASE}/scan?req=${linked.request?.id}`)).status === 200, "GET /scan?req=");
+
   console.log("\n── Policy switches ─────────────────────────────────────");
   await api("/api/settings", { method: "POST", body: JSON.stringify({ smsFallback: false }) });
   await api("/api/network", { method: "POST", body: JSON.stringify({ tier: "offline" }) });

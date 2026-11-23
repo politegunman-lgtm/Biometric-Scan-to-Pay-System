@@ -87,6 +87,36 @@ export function RangeRow({
   }
 }
 
+/**
+ * Native <details> disclosure styled as a row. Used to keep secondary controls
+ * (demo simulator, merchant leaderboard) out of the first read of a screen
+ * without deleting them.
+ */
+export function Disclosure({
+  title,
+  meta,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  meta?: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details className="disclosure" open={defaultOpen}>
+      <summary>
+        <span className="up">{title}</span>
+        {meta && <span className="tiny muted">{meta}</span>}
+        <span className="disclosure-caret" aria-hidden>
+          ⌄
+        </span>
+      </summary>
+      <div className="disclosure-body">{children}</div>
+    </details>
+  );
+}
+
 export function EmptyState({
   icon,
   title,

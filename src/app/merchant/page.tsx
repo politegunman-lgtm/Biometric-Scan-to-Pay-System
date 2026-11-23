@@ -24,6 +24,7 @@ export default function MerchantTerminalPage() {
   const [amount, setAmount] = useState("7500");
   const [note, setNote] = useState("Counter sale");
   const [active, setActive] = useState<PaymentRequest | null>(null);
+  const [phoneUrl, setPhoneUrl] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [now, setNow] = useState(Date.now());
 
@@ -51,12 +52,14 @@ export default function MerchantTerminalPage() {
   const merchant = merchants.find((m) => m.id === merchantId);
   const amountNumber = Number(amount.replace(/[^\d]/g, "")) || 0;
 
+  // The QR is a phone-openable deep link, not raw protocol bytes: scanning it
+  // with the camera app launches the wallet straight into this request.
   const qrData = useMemo(() => {
     if (!active) return null;
-    return encodeURIComponent(
-      ["BSP1", active.id, active.merchantId, String(active.amountXAF), active.nonce, String(new Date(active.expiresAt).getTime()), active.signature].join("|"),
-    );
-  }, [active]);
+    if (phoneUrl) return encodeURIComponent(phoneUrl);
+    const payload = ["BSP1", active.id, active.merchantId, String(active.amountXAF), active.nonce, String(new Date(active.expiresAt).getTime()), active.signature].join("|");
+    return encodeURIComponent(payload);
+  }, [active, phoneUrl]);
 
   const remaining = active ? Math.max(0, new Date(active.expiresAt).getTime() - now) : 0;
   const mm = Math.floor(remaining / 60_000);
@@ -68,11 +71,12 @@ export default function MerchantTerminalPage() {
     if (!merchant || amountNumber < 100) return;
     setCreating(true);
     try {
-      const res = await apiJson<{ request: PaymentRequest }>("/api/merchant", {
+      const res = await apiJson<{ request: PaymentRequest; phoneUrl?: string }>("/api/merchant", {
         method: "POST",
         body: JSON.stringify({ merchantId, amountXAF: amountNumber, note }),
       });
       setActive(res.request);
+      setPhoneUrl(res.phoneUrl ?? null);
       await load();
       void refresh();
       toast("Signed payment request live — scan it in the app", "ok");
@@ -215,10 +219,34 @@ export default function MerchantTerminalPage() {
                 </div>
               </div>
               {!paid && (
-                <p className="tiny muted center" style={{ maxWidth: 300, lineHeight: 1.5 }}>
-                  Scan this code in the wallet app (Scan → Nearby requests) or tap it from the wallet home. Signature is
-                  verified before the sensor opens; the amount cannot be altered in transit.
-                </p>
+                <>
+                  {phoneUrl && (
+                    <button
+                      type="button"
+                      className="chip"
+                      style={{ maxWidth: "100%" }}
+                      onClick={async () => {
+                        // navigator.clipboard needs a secure context; over plain
+                        // http LAN we fall back to showing the link.
+                        try {
+                          if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
+                          await navigator.clipboard.writeText(phoneUrl);
+                          toast("Payment link copied — paste it in the phone browser", "ok");
+                        } catch {
+                          toast(phoneUrl, "info");
+                        }
+                      }}
+                    >
+                      <Icon name="link" size={12} />
+                      <span className="truncate">{phoneUrl.replace(/^https?:\/\//, "")}</span>
+                      <Icon name="copy" size={12} />
+                    </button>
+                  )}
+                  <p className="tiny muted center" style={{ maxWidth: 300, lineHeight: 1.5 }}>
+                    Point the phone camera at this code, or open the link above on the phone. It lands directly on this
+                    request — the signature is verified before the sensor opens.
+                  </p>
+                </>
               )}
               {paid && (
                 <div className="btn-row" style={{ width: "100%" }}>

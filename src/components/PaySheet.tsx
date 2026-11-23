@@ -379,14 +379,14 @@ export function PaySheet() {
             />
             )}
 
-            <div className="sim-strip" style={{ marginTop: 4 }}>
-              <div className="sim-head">
+            <details className="sim-strip" style={{ marginTop: 4 }}>
+              <summary className="sim-head">
                 <span>
                   <Icon name="flask" size={10} style={{ marginRight: 4, verticalAlign: -1 }} />
                   Sensor simulator
                 </span>
                 <span>demo only</span>
-              </div>
+              </summary>
               <div className="sim-toggles">
                 <button
                   type="button"
@@ -422,7 +422,7 @@ export function PaySheet() {
                       ? "Low-quality capture, like dusty or dry skin — expect a weak score."
                       : "Genuine capture. Production binds this to Android BiometricPrompt / iOS LocalAuthentication."}
               </div>
-            </div>
+            </details>
 
             <div className="btn-row" style={{ marginTop: 12 }}>
               <button type="button" className="btn ghost" onClick={closePay} disabled={stage === "verifying"}>

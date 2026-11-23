@@ -5,7 +5,7 @@ import { useApp } from "@/components/AppProvider";
 import { TxnRow } from "@/components/TxnRow";
 import { AreaChart, Donut } from "@/components/charts";
 import { Icon } from "@/components/icons";
-import { EmptyState } from "@/components/controls";
+import { Disclosure, EmptyState } from "@/components/controls";
 import { CATEGORY_META, dayKey, money, niceDay, relativeTime } from "@/lib/format";
 import type { MerchantCategory } from "@/lib/types";
 
@@ -235,15 +235,17 @@ export default function ActivityPage() {
             ))}
           </div>
         </div>
-        <div className="hairline" style={{ margin: "12px 0 8px" }} />
-        <div className="up" style={{ marginBottom: 6 }}>top merchants</div>
-        {view.merchants.map((m) => (
-          <div className="row-between" key={m.name} style={{ padding: "4px 0", fontSize: 11.5 }}>
-            <span className="truncate" style={{ color: "var(--text-2)", flex: 1 }}>{m.name}</span>
-            <span className="muted" style={{ fontSize: 10.5, marginRight: 8 }}>{m.count}×</span>
-            <span className="num" style={{ fontSize: 11.5 }}>{money(m.total, { suffix: false })}</span>
-          </div>
-        ))}
+        <div style={{ marginTop: 12 }}>
+          <Disclosure title="Top merchants" meta={`${view.merchants.length} in ${period} days`}>
+            {view.merchants.map((m) => (
+              <div className="row-between" key={m.name} style={{ padding: "5px 0", fontSize: 11.5 }}>
+                <span className="truncate" style={{ color: "var(--text-2)", flex: 1 }}>{m.name}</span>
+                <span className="muted" style={{ fontSize: 10.5, marginRight: 8 }}>{m.count}×</span>
+                <span className="num" style={{ fontSize: 11.5 }}>{money(m.total, { suffix: false })}</span>
+              </div>
+            ))}
+          </Disclosure>
+        </div>
       </div>
 
       <div className="stack gap-10">
