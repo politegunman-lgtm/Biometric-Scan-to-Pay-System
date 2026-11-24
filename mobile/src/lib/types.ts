@@ -61,6 +61,9 @@ export interface Txn {
   category: string;
   offline?: boolean;
   receiptNo?: string;
+  reason?: string;
+  reasonId?: string;
+  payerFor?: string;
   channel?: string;
   provider?: string;
   walletId?: string;
@@ -111,6 +114,12 @@ export interface AppState {
   serverTime: string;
 }
 
+export interface PaymentReason {
+  id: string;
+  label: string;
+  askStudent?: boolean;
+}
+
 export interface Payee {
   id: string;
   name: string;
@@ -123,6 +132,7 @@ export interface Payee {
   code: string;
   msisdnMasked: string;
   onPlatform?: boolean;
+  reasons?: PaymentReason[];
 }
 
 export interface Directory {

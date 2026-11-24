@@ -93,6 +93,13 @@ Same biometrics, same fraud engine, same receipt — one path for every payment 
 - **List my business** (Wallet screen) opens the web enrolment page in the browser; the listing then shows up in the app's
   *Bills* tab, payable with a fingerprint. Enrollment itself stays web-side because it is a one-off onboarding form.
 
+## Reasons for payment
+
+Pick a school, clinic or utility in **Bills** and the composer shows its reasons as chips — *School fees*, *Library books*,
+*Exam fees*… Choosing one that asks who the payment is for reveals a **Student name** field. The reason travels with the
+signed request onto the receipt and into the school's terminal, so fees can be reconciled per student. Businesses edit
+their list in the web terminal (*Payment reasons*); the phone always reads the current list from the directory.
+
 ## Notes and limits
 
 - **A physical device is required** for meaningful testing: simulators have no camera and only fake biometrics.

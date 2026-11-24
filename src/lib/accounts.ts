@@ -1,5 +1,6 @@
 import { randomId, sha256Hex } from "./crypto";
 import { PROVIDER_META, ADAPTERS } from "./providers";
+import { defaultReasonsFor } from "./reasons";
 import { nowIso, pushAudit, type Database } from "./store";
 import type { GeoPoint, Merchant, MerchantCategory, ProviderId, Txn, Wallet } from "./types";
 
@@ -230,6 +231,9 @@ export function enrolMerchant(db: Database, input: EnrolInput) {
     tagline: about || `${kindMeta.label} · ${area || geo.city}`,
     enrolledAt: nowIso(),
     ownerMsisdn: msisdn,
+    // Schools, clinics and utilities start with a sensible reason list that
+    // they can edit in the terminal.
+    paymentReasons: defaultReasonsFor(kindMeta.category, kindMeta.kind),
   };
   db.merchants.unshift(merchant);
   pushAudit(

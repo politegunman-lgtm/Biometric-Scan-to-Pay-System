@@ -39,6 +39,8 @@ export function GET(req: Request) {
     "risk_decision",
     "biometric_score",
     "city",
+    "reason",
+    "paid_for",
   ];
   const escape = (v: unknown) => {
     const s = String(v ?? "");
@@ -60,6 +62,8 @@ export function GET(req: Request) {
       t.risk.decision,
       t.auth.matchScore,
       t.geo.city,
+      t.reason ?? "",
+      t.payerFor ?? "",
     ]
       .map(escape)
       .join(","),

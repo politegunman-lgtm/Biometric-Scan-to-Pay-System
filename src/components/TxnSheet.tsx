@@ -125,6 +125,18 @@ export function TxnSheet() {
               <span className="v">{txn.note}</span>
             </div>
           )}
+          {txn.reason && (
+            <div className="receipt-row">
+              <span className="k">Reason</span>
+              <span className="v">{txn.reason}</span>
+            </div>
+          )}
+          {txn.payerFor && (
+            <div className="receipt-row">
+              <span className="k">Paid for</span>
+              <span className="v">{txn.payerFor}</span>
+            </div>
+          )}
         </div>
 
         {voucher && (

@@ -115,8 +115,10 @@ export default function JoinPage() {
                 </div>
               </div>
               <p className="small muted" style={{ lineHeight: 1.6 }}>
-                Customers can now find this business in the app&apos;s <strong>Bills</strong> tab, enter an amount and pay with a
-                fingerprint. Nothing about the payment pipeline changes: a signed request is minted, the biometric match and the
+                Schools, clinics and utilities start with a ready-made list of <strong>reasons for payment</strong> — edit it
+                in the merchant terminal under <em>Payment reasons</em>; reasons flagged <em>asks student</em> also prompt the
+                payer for a student name. Customers can now find this business in the app&apos;s <strong>Bills</strong> tab,
+                enter an amount and pay with a fingerprint. Nothing about the payment pipeline changes: a signed request is minted, the biometric match and the
                 fraud engine run, and the receipt is issued. The listing shows a <em>new</em> badge until a reviewer confirms the
                 registration.
               </p>

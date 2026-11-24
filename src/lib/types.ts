@@ -134,6 +134,14 @@ export interface User {
   pinSet: boolean;
 }
 
+/** A reason for payment published by a payee (school fees, library fees, …). */
+export interface PaymentReason {
+  id: string;
+  label: string;
+  /** Ask who the payment is for — school fees name the student. */
+  askStudent?: boolean;
+}
+
 export interface Merchant {
   id: string;
   code: string;
@@ -158,10 +166,20 @@ export interface Merchant {
   enrolledAt?: string;
   /** Contact number given at enrolment (the paying customer never sees it unmasked). */
   ownerMsisdn?: string;
+  /**
+   * Reasons this payee lets customers choose from. `undefined` falls back to a
+   * category template (schools, clinics, utilities); `[]` means "none".
+   */
+  paymentReasons?: PaymentReason[];
 }
 
 export interface PaymentRequest {
   id: string;
+  /** Chosen reason label, snapshotted at request time. */
+  reason?: string;
+  reasonId?: string;
+  /** Who the payment is for, when the reason asks (a student's name). */
+  payerFor?: string;
   merchantId: string;
   merchantName: string;
   merchantCode: string;
@@ -242,6 +260,11 @@ export interface QueuedVoucher extends OfflineVoucher {
 
 export interface Txn {
   id: string;
+  /** Reason for payment, carried from the signed request onto the receipt. */
+  reason?: string;
+  reasonId?: string;
+  /** Student/beneficiary name for reasons that ask who the payment is for. */
+  payerFor?: string;
   ref: string;
   receiptNo: string;
   merchantId: string;

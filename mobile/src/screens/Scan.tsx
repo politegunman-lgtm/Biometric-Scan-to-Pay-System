@@ -15,7 +15,7 @@ import {
 import QRCode from "react-native-qrcode-svg";
 import { apiJson } from "../lib/api";
 import { CATEGORY_LABEL, expiryLabel, money } from "../lib/format";
-import type { Directory, PayTarget, Payee, PaymentRequest } from "../lib/types";
+import type { Directory, PayTarget, Payee, PaymentReason, PaymentRequest } from "../lib/types";
 import { useApp } from "../state";
 import { Badge, Button, Card, colors, Icon } from "../ui";
 
@@ -65,6 +65,8 @@ export function Scan({
   const [directory, setDirectory] = useState<Directory | null>(null);
   const [composer, setComposer] = useState<Payee | null>(null);
   const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState<PaymentReason | null>(null);
+  const [payerFor, setPayerFor] = useState("");
   const [sending, setSending] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [contactState, setContactState] = useState<"idle" | "loading" | "done" | "denied">("idle");
@@ -179,6 +181,10 @@ export function Scan({
       setMessage("Enter at least 100 FCFA");
       return;
     }
+    if (reason?.askStudent && payerFor.trim().length < 2) {
+      setMessage(`Enter the student's name for "${reason.label}"`);
+      return;
+    }
     setSending(true);
     try {
       const res = await apiJson<{ request: PaymentRequest }>("/api/merchant", {
@@ -187,10 +193,14 @@ export function Scan({
           merchantId: composer.id,
           amountXAF: Math.round(value),
           note: composer.kind === "person" ? "P2P transfer" : "Bill payment",
+          reasonId: reason?.id,
+          payerFor: reason?.askStudent ? payerFor.trim() : undefined,
         }),
       });
       setComposer(null);
       setAmount("");
+      setReason(null);
+      setPayerFor("");
       await refresh();
       onPay({
         requestId: res.request.id,
@@ -435,9 +445,25 @@ export function Scan({
       </ScrollView>
 
       {/* amount composer */}
-      <Modal visible={Boolean(composer)} transparent animationType="slide" onRequestClose={() => setComposer(null)}>
+      <Modal
+        visible={Boolean(composer)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setComposer(null);
+          setReason(null);
+          setPayerFor("");
+        }}
+      >
         <View style={styles.backdrop}>
-          <Pressable style={{ flex: 1 }} onPress={() => setComposer(null)} />
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={() => {
+              setComposer(null);
+              setReason(null);
+              setPayerFor("");
+            }}
+          />
           <View style={styles.sheet}>
             <View style={styles.grabber} />
             {composer && (
@@ -471,6 +497,43 @@ export function Scan({
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                {(composer.reasons?.length ?? 0) > 0 && (
+                  <>
+                    <Text style={styles.composerLabel}>REASON FOR PAYMENT</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reasonRow}>
+                      {(composer.reasons ?? []).map((r) => {
+                        const active = reason?.id === r.id;
+                        return (
+                          <TouchableOpacity
+                            key={r.id}
+                            style={[styles.reasonChip, active && styles.reasonChipActive]}
+                            onPress={() => {
+                              setReason(active ? null : r);
+                              if (!r.askStudent) setPayerFor("");
+                            }}
+                          >
+                            <Text style={[styles.reasonText, active && { color: colors.text }]}>{r.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                    {reason?.askStudent && (
+                      <>
+                        <Text style={styles.composerLabel}>STUDENT NAME</Text>
+                        <TextInput
+                          style={styles.fieldInput}
+                          value={payerFor}
+                          onChangeText={setPayerFor}
+                          placeholder="e.g. Marie Claire Ngo"
+                          placeholderTextColor={colors.muted}
+                          maxLength={60}
+                          autoCapitalize="words"
+                        />
+                      </>
+                    )}
+                  </>
+                )}
 
                 <Button
                   label={sending ? "Preparing…" : `Continue${Number(amount) >= 100 ? ` · ${money(Number(amount))}` : ""}`}
@@ -582,6 +645,27 @@ const styles = StyleSheet.create({
   composerLabel: { color: colors.muted, fontSize: 9.5, letterSpacing: 1.2, marginTop: 22, marginBottom: 4 },
   amountInput: { color: colors.text, fontSize: 34, fontWeight: "700", paddingVertical: 6 },
   quick: { flexDirection: "row", gap: 8, marginTop: 10 },
+  reasonRow: { flexDirection: "row", gap: 8, paddingVertical: 2 },
+  reasonChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  reasonChipActive: { borderColor: "rgba(255,203,5,0.5)", backgroundColor: "rgba(255,203,5,0.1)" },
+  reasonText: { color: colors.textDim, fontSize: 11.5, fontWeight: "600" },
+  fieldInput: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    color: colors.text,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
   quickChip: { flex: 1, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.line },
   quickText: { color: colors.textDim, fontSize: 12, fontWeight: "600" },
   codeBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", alignItems: "center", justifyContent: "center", padding: 24 },

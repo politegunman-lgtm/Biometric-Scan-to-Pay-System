@@ -20,6 +20,31 @@ export function Settings({ visible, onClose }: { visible: boolean; onClose: () =
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
             <Text style={styles.title}>Settings</Text>
 
+            <Text style={styles.label}>ACCOUNT</Text>
+            <Card>
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.value}>{state?.user.fullName ?? "Signed in"}</Text>
+                  <Text style={styles.hint}>{state?.user.phone ?? "Loading account…"}</Text>
+                </View>
+                <Badge label="signed in" tone="ok" />
+              </View>
+              <Button
+                label="Sign out &amp; use another number"
+                variant="soft"
+                icon="lock"
+                onPress={() => {
+                  onClose();
+                  void signOut();
+                }}
+                style={{ marginTop: 10 }}
+              />
+              <Text style={styles.hint}>
+                Signing out returns to the code screen. Payments still need the fingerprint afterwards.
+              </Text>
+            </Card>
+
+            <View style={{ height: 18 }} />
             <Text style={styles.label}>WALLET SERVICE ADDRESS</Text>
             <TextInput
               style={styles.input}
@@ -115,7 +140,8 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
   },
   hint: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 8 },
-  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  value: { color: colors.text, fontSize: 13, fontWeight: "600" },
   rowLabel: { color: colors.textDim, fontSize: 12.5 },
   rowValue: { color: colors.text, fontSize: 12.5 },
   about: { flexDirection: "row", gap: 8, marginTop: 18 },

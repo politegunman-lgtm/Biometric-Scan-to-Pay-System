@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -29,6 +29,13 @@ export function SignIn() {
 
   const accountNumber = (state?.wallets[0]?.msisdn ?? "677 12 34 56").replace(/[^\d ]/g, "");
   const valid = phone.replace(/\D/g, "").length >= 8;
+
+  /* Prefill the account number so the primary button is usable on the first tap. */
+  useEffect(() => {
+    if (state?.wallets[0]?.msisdn) {
+      setPhone((current) => current || state.wallets[0].msisdn.replace(/[^\d ]/g, ""));
+    }
+  }, [state]);
 
   const send = () => {
     if (!valid) return;
@@ -87,14 +94,18 @@ export function SignIn() {
               />
             </View>
 
-            <Button label={sending ? "Sending…" : "Send code"} onPress={send} disabled={!valid || sending} style={{ marginTop: 14 }} />
-            <Pressable onPress={() => setPhone(accountNumber)} hitSlop={8}>
-              <Text style={styles.link}>Use {accountNumber}</Text>
-            </Pressable>
-
+            <Button
+              label={sending ? "Sending…" : "Send code"}
+              onPress={send}
+              disabled={!valid || sending}
+              style={{ marginTop: 14, minHeight: 52 }}
+            />
             <Text style={styles.footnote}>
               The code proves you hold the SIM. Your fingerprint is what authorises each payment — that second step never
               leaves this device.
+            </Text>
+            <Text style={styles.demoHint}>
+              Demo build · the code is 123456 · account +237 {accountNumber}
             </Text>
           </>
         ) : (
@@ -138,7 +149,7 @@ export function SignIn() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 24, paddingTop: 56 },
+  container: { flexGrow: 1, padding: 22, paddingTop: 36 },
   mark: {
     width: 54,
     height: 54,
@@ -151,7 +162,7 @@ const styles = StyleSheet.create({
   markGlyph: { color: colors.ink, fontSize: 26, fontWeight: "700" },
   brand: { color: colors.text, fontSize: 22, fontWeight: "700", textAlign: "center", marginTop: 14 },
   sub: { color: colors.muted, fontSize: 12, textAlign: "center", marginTop: 4 },
-  title: { color: colors.text, fontSize: 26, fontWeight: "700", marginTop: 34 },
+  title: { color: colors.text, fontSize: 24, fontWeight: "700", marginTop: 24 },
   body: { color: colors.textDim, fontSize: 13.5, lineHeight: 20, marginTop: 8, marginBottom: 20 },
   label: { color: colors.muted, fontSize: 10, letterSpacing: 1.1, marginBottom: 8, marginLeft: 2 },
   field: {
@@ -181,6 +192,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", marginTop: 14 },
   link: { color: colors.brand, fontSize: 13, marginTop: 14 },
   linkMuted: { color: colors.textDim, fontSize: 13, marginTop: 14 },
-  footnote: { color: colors.muted, fontSize: 11.5, lineHeight: 17, marginTop: 26 },
+  footnote: { color: colors.muted, fontSize: 11.5, lineHeight: 17, marginTop: 18 },
+  demoHint: { color: colors.textDim, fontSize: 11.5, marginTop: 14, textAlign: "center" },
   hint: { color: colors.muted, fontSize: 10, textAlign: "center", marginTop: 24 },
 });

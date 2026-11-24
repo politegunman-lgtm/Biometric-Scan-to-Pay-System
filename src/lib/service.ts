@@ -34,6 +34,7 @@ import {
   type Database,
 } from "./store";
 import { computeStats } from "./stats";
+import { resolveReason } from "./reasons";
 import { NETWORK_PRESETS, transportFor } from "./transport";
 import { money } from "./format";
 import type {
@@ -60,6 +61,8 @@ export interface PayInput {
   merchantId?: string;
   amountXAF?: number;
   note?: string;
+  reasonId?: string;
+  payerFor?: string;
   walletId?: string;
   fingerId?: string;
   sample?: number[];
@@ -180,10 +183,18 @@ function makeAlert(db: Database, args: {
 
 export function createPaymentRequest(
   db: Database,
-  input: { merchantId: string; amountXAF: number; note?: string; ttlMinutes?: number },
+  input: {
+    merchantId: string;
+    amountXAF: number;
+    note?: string;
+    ttlMinutes?: number;
+    reasonId?: string;
+    payerFor?: string;
+  },
 ): PaymentRequest {
   const merchant = db.merchants.find((m) => m.id === input.merchantId);
   if (!merchant) throw new Error("Unknown merchant");
+  const chosen = resolveReason(merchant, input.reasonId, input.payerFor);
   const amount = Math.round(input.amountXAF);
   if (!Number.isFinite(amount) || amount < 100 || amount > 2_000_000) {
     throw new Error("Amount must be between 100 and 2,000,000 FCFA");
@@ -201,6 +212,9 @@ export function createPaymentRequest(
     amountXAF: amount,
     ref: `QR-${nonce.slice(0, 6).toUpperCase()}`,
     note: input.note,
+    reason: chosen.reason,
+    reasonId: chosen.reasonId,
+    payerFor: chosen.payerFor,
     createdAt: createdAt.toISOString(),
     expiresAt: new Date(exp).toISOString(),
     nonce,
@@ -260,6 +274,9 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
   let merchant = input.merchantId ? db.merchants.find((m) => m.id === input.merchantId) : undefined;
   let amount = input.amountXAF ?? 0;
   let note = input.note;
+  let reason: string | undefined;
+  let reasonId: string | undefined;
+  let payerFor: string | undefined;
   let request: PaymentRequest | undefined;
   let channel: PaymentChannel = input.channel ?? "qr-scan";
 
@@ -286,10 +303,25 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
     merchant = db.merchants.find((m) => m.id === request!.merchantId);
     amount = request.amountXAF;
     note = note ?? request.note;
+    // The reason was chosen and validated when the request was minted; the
+    // receipt must carry the same label the payer saw.
+    reason = request.reason;
+    reasonId = request.reasonId;
+    payerFor = request.payerFor;
     channel = request.channel;
   }
 
   if (!merchant) return { status: "error", message: "Unknown merchant", errorCode: "unknown-merchant" };
+  if (!request && (input.reasonId || input.payerFor)) {
+    try {
+      const chosen = resolveReason(merchant, input.reasonId, input.payerFor);
+      reason = chosen.reason;
+      reasonId = chosen.reasonId;
+      payerFor = chosen.payerFor;
+    } catch (err) {
+      return { status: "error", message: (err as Error).message, errorCode: "bad-reason" };
+    }
+  }
   amount = Math.round(amount);
   if (!Number.isFinite(amount) || amount <= 0) {
     return { status: "error", message: "Invalid amount", errorCode: "bad-amount" };
@@ -439,6 +471,7 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
   if (risk.decision === "block") {
     const txn = finaliseTxn(db, {
       merchant, amount, request, risk, auth, geo: merchant.geo, note,
+      reason, reasonId, payerFor,
       channel: offlineChannel, offline: effectiveOffline, wallet: payWallet,
       deviceLabel: device.label, at, status: "declined", id: randomId("txn"),
     });
@@ -484,7 +517,7 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
     return queueOffline(db, {
       wallet: payWallet, merchant, amount, request, risk, auth, biometric,
       channel: input.channel === "offline-sms" ? "offline-sms" : "offline-qr",
-      note, device, at,
+      note, reason, reasonId, payerFor, device, at,
     });
   }
 
@@ -515,6 +548,7 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
   payWallet.balanceXAF = charge.balanceAfterXAF;
   const txn = finaliseTxn(db, {
     merchant, amount, request, risk, auth, geo: merchant.geo, note,
+    reason, reasonId, payerFor,
     channel: offlineChannel, offline: false, wallet: payWallet, deviceLabel: device.label,
     at, status: "settled", id: txnId,
   });
@@ -556,6 +590,9 @@ function finaliseTxn(
     auth: AuthEvidence;
     geo: { lat: number; lng: number; city: string };
     note?: string;
+    reason?: string;
+    reasonId?: string;
+    payerFor?: string;
     channel: PaymentChannel;
     offline: boolean;
     wallet: Database["wallets"][number];
@@ -585,6 +622,9 @@ function finaliseTxn(
     risk: args.risk,
     geo: args.geo,
     note: args.note,
+    reason: args.reason,
+    reasonId: args.reasonId,
+    payerFor: args.payerFor,
     createdAt: args.at.toISOString(),
     settledAt: args.status === "settled" ? args.at.toISOString() : null,
     syncedAt: args.status === "settled" ? args.at.toISOString() : null,
@@ -618,6 +658,9 @@ function queueOffline(
     biometric: PayOutcome["biometric"];
     channel: "offline-qr" | "offline-sms";
     note?: string;
+    reason?: string;
+    reasonId?: string;
+    payerFor?: string;
     device: Database["devices"][number];
     at: Date;
   },
@@ -697,6 +740,9 @@ function queueOffline(
     auth: args.auth,
     geo: args.merchant.geo,
     note: args.note,
+    reason: args.reason,
+    reasonId: args.reasonId,
+    payerFor: args.payerFor,
     channel: args.channel,
     offline: true,
     wallet: args.wallet,

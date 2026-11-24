@@ -7,7 +7,7 @@ import { MerchantAvatar } from "@/components/MerchantAvatar";
 import { Icon } from "@/components/icons";
 import { apiJson } from "@/lib/client";
 import { CATEGORY_META, PROVIDER_LABEL, money, relativeTime, timeLabel } from "@/lib/format";
-import type { Merchant, PaymentRequest, Txn } from "@/lib/types";
+import type { Merchant, PaymentReason, PaymentRequest, Txn } from "@/lib/types";
 
 interface TerminalData {
   merchants: Merchant[];
@@ -27,6 +27,40 @@ export default function MerchantTerminalPage() {
   const [phoneUrl, setPhoneUrl] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [reasons, setReasons] = useState<PaymentReason[]>([]);
+  const [reasonLabel, setReasonLabel] = useState("");
+  const [reasonAsksStudent, setReasonAsksStudent] = useState(false);
+  const [reasonsBusy, setReasonsBusy] = useState(false);
+
+  const loadReasons = useCallback(async (id: string) => {
+    try {
+      const res = await apiJson<{ reasons: PaymentReason[] }>(`/api/reasons?merchantId=${encodeURIComponent(id)}`);
+      setReasons(res.reasons);
+    } catch {
+      setReasons([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (merchantId) void loadReasons(merchantId);
+  }, [merchantId, loadReasons]);
+
+  const saveReasons = async () => {
+    setReasonsBusy(true);
+    try {
+      const res = await apiJson<{ message: string }>("/api/reasons", {
+        method: "POST",
+        body: JSON.stringify({ merchantId, reasons }),
+      });
+      toast(res.message, "ok");
+      // Re-read so ids match what the server stored (it slugifies labels).
+      await loadReasons(merchantId);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not save reasons", "danger");
+    } finally {
+      setReasonsBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -137,7 +171,7 @@ export default function MerchantTerminalPage() {
 
           <div className="stack gap-12">
             <div className="field">
-              <label htmlFor="merchant">Merchant profile</label>
+              <label htmlFor="merchant">Payee profile</label>
               <select id="merchant" className="select" value={merchantId} onChange={(e) => setMerchantId(e.target.value)}>
                 {merchants.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -209,6 +243,12 @@ export default function MerchantTerminalPage() {
                 <div className="tiny muted" style={{ marginTop: 2 }}>
                   {active.ref} · {active.note ?? "Payment request"}
                 </div>
+                {active.reason && (
+                  <div className="tiny" style={{ marginTop: 3, color: "var(--accent)" }}>
+                    {active.reason}
+                    {active.payerFor ? ` · ${active.payerFor}` : ""}
+                  </div>
+                )}
                 <div className="row gap-6" style={{ justifyContent: "center", marginTop: 7 }}>
                   {paid ? (
                     <span className="badge ok">settled {paidTxn ? timeLabel(paidTxn.settledAt ?? paidTxn.createdAt) : ""}</span>
@@ -330,12 +370,101 @@ export default function MerchantTerminalPage() {
                   <div className="tiny muted">
                     {timeLabel(t.createdAt)} · {PROVIDER_LABEL[t.provider]} {t.offline ? "· offline" : ""}
                   </div>
+                  {(t.reason || t.payerFor) && (
+                    <div className="tiny" style={{ color: "var(--text-2)" }}>
+                      {t.reason ?? "Payment"}
+                      {t.payerFor ? ` · ${t.payerFor}` : ""}
+                    </div>
+                  )}
                 </div>
                 <span className={`badge ${t.status === "settled" ? "ok" : t.status === "queued" ? "warn" : "danger"}`}>
                   {money(t.amountXAF, { suffix: false })}
                 </span>
               </div>
             ))}
+          </div>
+
+          <div className="panel">
+            <div className="row-between" style={{ marginBottom: 6 }}>
+              <h2 style={{ fontSize: 15 }}>Payment reasons</h2>
+              <span className="badge muted">{reasons.length}</span>
+            </div>
+            <p className="tiny muted" style={{ marginBottom: 10, lineHeight: 1.5 }}>
+              Reasons customers can pick when they pay {merchant?.name ?? "this payee"} from the app. Schools and clinics use
+              them to reconcile fees; reasons flagged <em>asks student</em> also prompt for the student&rsquo;s name.
+            </p>
+            <div className="row gap-6" style={{ flexWrap: "wrap", marginBottom: 10 }}>
+              {reasons.map((r) => (
+                <span key={r.id} className="chip active" style={{ gap: 6 }}>
+                  {r.label}
+                  {r.askStudent && <span className="tiny" style={{ opacity: 0.7 }}>· student</span>}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${r.label}`}
+                    onClick={() => setReasons((list) => list.filter((x) => x.id !== r.id))}
+                    style={{ background: "none", border: "none", color: "inherit", padding: 0, cursor: "pointer" }}
+                  >
+                    <Icon name="x" size={10} />
+                  </button>
+                </span>
+              ))}
+              {reasons.length === 0 && <span className="tiny muted">No reasons published yet.</span>}
+            </div>
+            <div className="stack gap-8">
+              <div className="row gap-8">
+                <input
+                  className="input"
+                  placeholder="Add a reason, e.g. Library books"
+                  value={reasonLabel}
+                  maxLength={40}
+                  onChange={(e) => setReasonLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && reasonLabel.trim().length >= 2) {
+                      setReasons((list) => [
+                        ...list,
+                        { id: `draft_${list.length + 1}`, label: reasonLabel.trim(), askStudent: reasonAsksStudent },
+                      ]);
+                      setReasonLabel("");
+                    }
+                  }}
+                />
+                <button
+                  className="btn ghost sm"
+                  type="button"
+                  disabled={reasonLabel.trim().length < 2 || reasons.length >= 8}
+                  onClick={() => {
+                    setReasons((list) => [
+                      ...list,
+                      { id: `draft_${list.length + 1}`, label: reasonLabel.trim(), askStudent: reasonAsksStudent },
+                    ]);
+                    setReasonLabel("");
+                  }}
+                >
+                  <Icon name="plus" size={13} />
+                  Add
+                </button>
+              </div>
+              <label className="row gap-8 tiny muted" style={{ alignItems: "center", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={reasonAsksStudent}
+                  onChange={(e) => setReasonAsksStudent(e.target.checked)}
+                />
+                Ask for the student&rsquo;s name when this reason is chosen
+              </label>
+              <button
+                className="btn soft sm"
+                type="button"
+                onClick={() => void saveReasons()}
+                disabled={reasonsBusy || merchant?.kind === "person"}
+              >
+                <Icon name="check" size={13} />
+                {reasonsBusy ? "Saving…" : "Save reasons"}
+              </button>
+              <span className="tiny muted">
+                Customers see the saved list the next time they pick this payee. Up to 8 reasons.
+              </span>
+            </div>
           </div>
 
           <div className="panel">

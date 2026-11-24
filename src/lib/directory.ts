@@ -1,5 +1,6 @@
+import { reasonsFor } from "./reasons";
 import type { Database } from "./store";
-import type { Merchant } from "./types";
+import type { Merchant, PaymentReason } from "./types";
 
 /**
  * Payee directory shared by the people picker, the bill/services list and the
@@ -23,6 +24,8 @@ export interface PayeeEntry {
   msisdnMasked: string;
   /** Listed by the business itself, not yet reviewed. */
   isNew?: boolean;
+  /** Reasons this payee offers, so the payer can pick one before authorising. */
+  reasons: PaymentReason[];
 }
 
 const digits = (value: string) => value.replace(/\D/g, "");
@@ -58,6 +61,7 @@ export function toEntry(m: Merchant): PayeeEntry {
     code: m.code,
     msisdnMasked: maskMsisdn(m.msisdn),
     isNew: Boolean(m.enrolledAt),
+    reasons: reasonsFor(m),
   };
 }
 
@@ -125,5 +129,6 @@ export function selfEntry(db: Database): PayeeEntry | null {
     verified: true,
     code: "YOU",
     msisdnMasked: maskMsisdn(db.user.phone),
+    reasons: [],
   };
 }

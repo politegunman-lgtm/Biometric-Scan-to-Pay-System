@@ -108,7 +108,8 @@ with your own QR, contact discovery, provider choice at payment time, audit trai
 | 12 | **Wallet → Make primary** on another provider | The default funding switches; the pay sheet opens on that wallet. **Link another account** adds a fourth wallet with a sandbox float. |
 | 13 | `/join` → list a business | It appears in the app's **Bills** tab with a `new` badge; pick it, enter an amount, authorise with a fingerprint. |
 | 14 | **Activity → Recipients** | Who you paid, how often and how much, with **Pay again** and a recipients CSV. |
-| 15 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
+| 15 | **Bills → Lycée Leclerc** | Pick a reason (**School fees**), type the student's name, pay. The reason and name land on the receipt and in the terminal's list. |
+| 16 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
 
 ### Payees, billers and people
 
@@ -127,6 +128,7 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
 | `GET /api/wallets` · `POST /api/wallets` | Linked provider accounts; `{action:"primary"}` switches the default funding wallet, `{action:"link", provider, msisdn}` adds one. |
 | `GET /api/enroll` · `POST /api/enroll` | Business self-enrolment: types, cities and the newest listings; a valid enrolment becomes a payable payee immediately. |
 | `GET /api/export?type=ledger` · `?type=recipients` | Your payments, or an aggregated list of who you paid. |
+| `GET /api/reasons?merchantId=` · `POST /api/reasons` | The reasons a payee publishes, and the editor behind them (merchant terminal). |
 
 ### Payment options, business enrolment and recipients
 
@@ -137,6 +139,13 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
   neighbourhood and a phone number. It is written as a payee with `kind`/`category`, `enrolledAt` and `verified: false`
   (the listing shows a `new` badge until a reviewer checks the registration). From then on it is findable in the app and
   payable with a fingerprint — no parallel pipeline, no separate settlement path.
+- **Reasons for payment.** A payee can publish up to eight reasons (school fees, library books, exam fees, …). The payer
+  picks one in the amount composer; if the reason is flagged *asks student*, the app also asks who the payment is for.
+  Both fields travel with the signed request onto the receipt (`txn.reason`, `txn.payerFor`) and into the ledger CSV, so a
+  school can reconcile fees from the terminal or the export. Schools, clinics and utilities start with a template and edit
+  it under **Payment reasons** in the terminal; the directory hands the list to both apps, so the dropdown is always the
+  payee's current list. Reasons are validated server-side — an unknown reason, or a student-name reason without a name, is
+  rejected when the request is minted.
 - **Recipients.** Activity groups settled and queued payments per payee, so you can see who you have paid, how often and
   in what total, **Pay again** the last amount, or download the recipients as CSV. The Expo app offers the same data in a
   payment detail sheet with a share sheet for the CSV and for an individual receipt.
@@ -211,7 +220,7 @@ src/app/(app)/          phone shell: home, scan, activity, security, wallet
 src/app/merchant/       merchant terminal (signed QR requests)
 src/app/join/           business self-enrolment (list a payee)
 src/app/docs/           in-app architecture & API document
-src/app/api/            state, pay, biometric, merchant, directory, wallets, enroll, sync, network, fraud, settings, devices, export, qr
+src/app/api/            state, pay, biometric, merchant, directory, wallets, enroll, reasons, sync, network, fraud, settings, devices, export, qr
 src/lib/biometrics.ts   matching, liveness, sensor synthesis
 src/lib/fraud.ts        scoring engine, family caps, hard rules, baseline learner
 src/lib/offline.ts      voucher protocol, settlement checks, transport ladder
@@ -220,6 +229,7 @@ src/lib/crypto.ts       AES-256-GCM seals, Ed25519, scrypt, HMAC
 src/lib/store.ts        atomic JSON persistence + seed
 src/lib/providers.ts    MTN MoMo / Orange Money / Express Union adapters
 src/lib/accounts.ts     wallet linking / default wallet, business enrolment, recipients
+src/lib/reasons.ts      reason-for-payment catalogue, validation, student-name rule
 src/components/         app shell, pay sheet, biometric pad, charts, risk UI
 tests/                  unit tests (fraud, offline, biometrics, crypto, accounts)
 scripts/smoke.mts       end-to-end API walkthrough

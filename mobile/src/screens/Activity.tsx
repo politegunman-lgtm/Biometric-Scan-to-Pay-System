@@ -169,7 +169,9 @@ export function Activity({ onPay }: { onPay: (target: PayTarget) => void }) {
 
               <View style={styles.sheetRows}>
                 {[
-                  ["Receipt", detail.receiptNo],
+                  ...(detail.reason ? [["Reason", detail.reason] as [string, string]] : []),
+                  ...(detail.payerFor ? [["Paid for", detail.payerFor] as [string, string]] : []),
+                  ["Receipt", detail.receiptNo ?? "—"],
                   ["Reference", detail.ref],
                   ["When", `${clockTime(detail.createdAt)} · ${relativeTime(detail.createdAt)}`],
                   ["Channel", detail.offline ? `${detail.channel} (offline)` : detail.channel],

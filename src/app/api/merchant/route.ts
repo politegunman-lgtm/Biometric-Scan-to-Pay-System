@@ -45,6 +45,8 @@ interface Body {
   note?: string;
   ttlMinutes?: number;
   requestId?: string;
+  reasonId?: string;
+  payerFor?: string;
 }
 
 /** GET /api/merchant — merchant terminal view: open requests + today's takings. */
@@ -90,6 +92,8 @@ export async function POST(req: Request) {
         amountXAF: Number(body.amountXAF ?? 0),
         note: body.note,
         ttlMinutes: body.ttlMinutes,
+        reasonId: body.reasonId,
+        payerFor: body.payerFor,
       });
       const origin = phoneOrigin(req);
       return {

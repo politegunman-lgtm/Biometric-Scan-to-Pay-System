@@ -6,6 +6,7 @@ import { MerchantAvatar } from "@/components/MerchantAvatar";
 import { Icon } from "@/components/icons";
 import { EmptyState } from "@/components/controls";
 import { apiJson, sleep } from "@/lib/client";
+import { reasonsFor } from "@/lib/reasons";
 import { CATEGORY_META, money, relativeTime } from "@/lib/format";
 import type { PaymentRequest } from "@/lib/types";
 
@@ -21,6 +22,7 @@ interface Payee {
   code: string;
   msisdnMasked: string;
   isNew?: boolean;
+  reasons: { id: string; label: string; askStudent?: boolean }[];
 }
 
 interface Directory {
@@ -49,6 +51,8 @@ export default function ScanPage() {
   const [query, setQuery] = useState("");
   const [payee, setPayee] = useState<Payee | null>(null);
   const [sendAmount, setSendAmount] = useState("");
+  const [reasonId, setReasonId] = useState<string>("");
+  const [payerFor, setPayerFor] = useState("");
   const [sending, setSending] = useState(false);
   const [origin, setOrigin] = useState("");
 
@@ -174,15 +178,28 @@ export default function ScanPage() {
       toast("Enter at least 100 FCFA", "warn");
       return;
     }
+    const reason = target.reasons.find((r) => r.id === reasonId);
+    if (reason?.askStudent && payerFor.trim().length < 2) {
+      toast(`Enter the student's name for "${reason.label}"`, "warn");
+      return;
+    }
     setSending(true);
     try {
       const res = await apiJson<{ request: PaymentRequest }>("/api/merchant", {
         method: "POST",
-        body: JSON.stringify({ merchantId: target.id, amountXAF: Math.round(value), note }),
+        body: JSON.stringify({
+          merchantId: target.id,
+          amountXAF: Math.round(value),
+          note,
+          reasonId: reasonId || undefined,
+          payerFor: reason?.askStudent ? payerFor.trim() : undefined,
+        }),
       });
       await refresh();
       setPayee(null);
       setSendAmount("");
+      setReasonId("");
+      setPayerFor("");
       openPay({
         requestId: res.request.id,
         merchantId: res.request.merchantId,
@@ -380,6 +397,7 @@ export default function ScanPage() {
                     verified: selected.verified,
                     code: selected.code,
                     msisdnMasked: "",
+                    reasons: reasonsFor(selected),
                   },
                   manualAmount,
                   "Manual entry",
@@ -445,6 +463,46 @@ export default function ScanPage() {
                   </button>
                 ))}
               </div>
+
+              {payee.reasons.length > 0 && (
+                <>
+                  <div className="field" style={{ marginTop: 12 }}>
+                    <label htmlFor="reason">Reason for payment</label>
+                    <select
+                      id="reason"
+                      className="select"
+                      value={reasonId}
+                      onChange={(e) => {
+                        setReasonId(e.target.value);
+                        const next = payee.reasons.find((r) => r.id === e.target.value);
+                        if (!next?.askStudent) setPayerFor("");
+                      }}
+                    >
+                      <option value="">Choose a reason (optional)…</option>
+                      {payee.reasons.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {payee.reasons.find((r) => r.id === reasonId)?.askStudent && (
+                    <div className="field" style={{ marginTop: 10 }}>
+                      <label htmlFor="payer-for">Student name</label>
+                      <input
+                        id="payer-for"
+                        className="input"
+                        placeholder="e.g. Marie Claire Ngo"
+                        value={payerFor}
+                        maxLength={60}
+                        onChange={(e) => setPayerFor(e.target.value)}
+                      />
+                      <span className="tiny muted">Appears on the receipt so the school can match the payment to a student.</span>
+                    </div>
+                  )}
+                </>
+              )}
+
               <button
                 className="btn primary block"
                 type="button"
@@ -477,6 +535,8 @@ export default function ScanPage() {
                       onClick={() => {
                         setPayee(person);
                         setSendAmount("");
+                        setReasonId("");
+                        setPayerFor("");
                         window.setTimeout(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
                       }}
                     >
@@ -556,6 +616,8 @@ export default function ScanPage() {
                     onClick={() => {
                       setPayee(service);
                       setSendAmount("");
+                      setReasonId("");
+                      setPayerFor("");
                       window.setTimeout(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
                     }}
                   >
