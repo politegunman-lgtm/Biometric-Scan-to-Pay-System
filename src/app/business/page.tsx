@@ -29,6 +29,8 @@ interface PortalPayee {
   tagline: string | null;
   verified: boolean;
   enrolledAt: string | null;
+  schoolLevel?: "primary" | "secondary" | "university" | null;
+  pinIsOwn?: boolean;
 }
 
 interface GroupBucket {
@@ -354,6 +356,7 @@ export default function BusinessPortalPage() {
             <h1 style={{ fontSize: 21, marginTop: 1 }}>{data?.payee.name ?? session.name}</h1>
             <div className="tiny muted" style={{ marginTop: 2 }}>
               {session.code} · {data ? `${data.payee.city} · ${CATEGORY_META[data.payee.category].label}` : ""}
+              {data?.payee.schoolLevel ? ` · ${data.payee.schoolLevel}` : ""}
               {data?.payee.verified ? " · verified" : data ? " · pending review" : ""}
             </div>
           </div>

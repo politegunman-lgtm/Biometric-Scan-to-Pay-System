@@ -1,15 +1,19 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Contacts from "expo-contacts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
@@ -84,6 +88,13 @@ export function Scan({
   const [payerDetails, setPayerDetails] = useState<PayerDetails>({});
   const [sending, setSending] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  // Android gives a transparent modal its own window, so the activity's
+  // adjustResize never fires for it. Track the keyboard ourselves and lift the
+  // sheet by exactly its height, otherwise the name/class fields end up behind
+  // the keyboard while the payer types.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetScroll = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
   const [contactState, setContactState] = useState<"idle" | "loading" | "done" | "denied">("idle");
   const [contactMatches, setContactMatches] = useState<Payee[]>([]);
 
@@ -241,6 +252,20 @@ export function Scan({
     } finally {
       setSending(false);
     }
+  };
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  /** Keep the field the payer just tapped in view as the keyboard opens. */
+  const revealSheetFields = () => {
+    setTimeout(() => sheetScroll.current?.scrollToEnd({ animated: true }), 180);
   };
 
   const row = (payee: Payee, onPress: () => void, badge?: string) => (
@@ -491,8 +516,26 @@ export function Scan({
               setPayerDetails({});
             }}
           />
-          <View style={styles.sheet}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ width: "100%" }}
+          >
+          <View
+            style={[
+              styles.sheet,
+              // Never taller than the space left above the keyboard, so the
+              // fields scroll instead of hiding behind it.
+              { maxHeight: Math.max(260, windowHeight - keyboardHeight - 56) },
+              Platform.OS === "android" && keyboardHeight > 0 ? { marginBottom: keyboardHeight } : null,
+            ]}
+          >
             <View style={styles.grabber} />
+            <ScrollView
+              ref={sheetScroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 4 }}
+            >
             {composer && (
               <>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 11 }}>
@@ -557,6 +600,7 @@ export function Scan({
                           placeholderTextColor={colors.muted}
                           maxLength={60}
                           autoCapitalize="words"
+                          onFocus={revealSheetFields}
                         />
                       </>
                     )}
@@ -570,6 +614,7 @@ export function Scan({
                           placeholder={PLACEHOLDER[field]}
                           placeholderTextColor={colors.muted}
                           maxLength={40}
+                          onFocus={revealSheetFields}
                         />
                       </View>
                     ))}
@@ -588,7 +633,9 @@ export function Scan({
                 </Text>
               </>
             )}
+            </ScrollView>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 

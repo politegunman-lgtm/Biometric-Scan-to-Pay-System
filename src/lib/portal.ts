@@ -192,6 +192,8 @@ export function portalView(db: Database, merchant: Merchant, filters: PortalFilt
       tagline: merchant.tagline ?? null,
       verified: merchant.verified,
       enrolledAt: merchant.enrolledAt ?? null,
+      schoolLevel: merchant.schoolLevel ?? null,
+      pinIsOwn: Boolean(merchant.portalPin),
     },
     reasons: reasonsFor(merchant),
     filters: { ...filters, groupBy },

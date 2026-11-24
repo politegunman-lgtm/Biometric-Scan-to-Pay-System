@@ -23,7 +23,8 @@
         "USE_BIOMETRIC",
         "USE_FINGERPRINT"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "splash": {
       "image": "./assets/splash-icon.png",

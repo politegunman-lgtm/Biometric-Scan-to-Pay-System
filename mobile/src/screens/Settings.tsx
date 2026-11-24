@@ -1,5 +1,18 @@
-import { useEffect, useState } from "react";
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { defaultBase } from "../lib/api";
 import { relativeTime } from "../lib/format";
 import { useApp } from "../state";
@@ -8,16 +21,44 @@ import { Badge, Button, Card, colors, Divider, Icon } from "../ui";
 export function Settings({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { base, saveBase, signOut, state, refresh } = useApp();
   const [draft, setDraft] = useState(base);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetScroll = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
 
   useEffect(() => setDraft(base), [base, visible]);
+
+  // Same story as the payment sheet: an Android modal has its own window, so
+  // the keyboard is measured here and the sheet is lifted by its height.
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  const revealFields = () => setTimeout(() => sheetScroll.current?.scrollToEnd({ animated: true }), 180);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.sheet}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ width: "100%" }}>
+        <View
+          style={[
+            styles.sheet,
+            { maxHeight: Math.max(280, windowHeight - keyboardHeight - 56) },
+            Platform.OS === "android" && keyboardHeight > 0 ? { marginBottom: keyboardHeight } : null,
+          ]}
+        >
           <View style={styles.grabber} />
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+          <ScrollView
+            ref={sheetScroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
             <Text style={styles.title}>Settings</Text>
 
             <Text style={styles.label}>ACCOUNT</Text>
@@ -58,7 +99,9 @@ export function Settings({ visible, onClose }: { visible: boolean; onClose: () =
                 onPress={() => void Linking.openURL(`${base.replace(/\/$/, "")}/business`)}
                 style={{ marginTop: 10 }}
               />
-              <Text style={styles.hint}>Sign in with the payee code and the 4-digit access PIN.</Text>
+              <Text style={styles.hint}>
+                Sign in with the code issued when the business enrolled and the 4-digit PIN it chose.
+              </Text>
             </Card>
 
             <Text style={styles.label}>WALLET SERVICE ADDRESS</Text>
@@ -71,6 +114,7 @@ export function Settings({ visible, onClose }: { visible: boolean; onClose: () =
               placeholder={defaultBase()}
               placeholderTextColor={colors.muted}
               keyboardType="url"
+              onFocus={revealFields}
             />
             <Text style={styles.hint}>
               Defaults to the computer running Metro, port 3000. Change it if the API lives elsewhere on the network.
@@ -123,7 +167,8 @@ export function Settings({ visible, onClose }: { visible: boolean; onClose: () =
               </Text>
             </View>
           </ScrollView>
-        </View>
+      </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );

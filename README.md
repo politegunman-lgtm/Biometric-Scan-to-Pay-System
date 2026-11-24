@@ -106,7 +106,7 @@ with your own QR, contact discovery, provider choice at payment time, audit trai
 | 11 | **People → Your code** → scan it from another phone | Their camera opens `/scan?to=…` with your name pre-filled; they choose the amount. |
 | 12 | **People → Find from contacts** | Matches your address book against registered numbers; only masked numbers are ever returned. |
 | 12 | **Wallet → Make primary** on another provider | The default funding switches; the pay sheet opens on that wallet. **Link another account** adds a fourth wallet with a sandbox float. |
-| 13 | `/join` → list a business | It appears in the app's **Bills** tab with a `new` badge; pick it, enter an amount, authorise with a fingerprint. |
+| 13 | `/join` → list a business | Pick the type, and for a school say primary / secondary / **university**; choose a 4-digit portal PIN. The system issues the payee code. It appears in the app's **Bills** tab with a `new` badge. |
 | 14 | **Activity → Recipients** | Who you paid, how often and how much, with **Pay again** and a recipients CSV. |
 | 15 | **Bills → Lycée Leclerc** | Pick a reason (**School fees**), type the student's name, pay. The reason and name land on the receipt and in the terminal's list. |
 | 16 | `/business` → code **A2DE5**, PIN **2468** | The school's own seat: fees grouped by reason and class, search by student, CSV of the exact view. Université de Yaoundé I (**0133E**) adds faculty, department and year. |
@@ -127,7 +127,7 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
 | `GET /api/directory?q=` | People + services, phone numbers masked (`+237 6•• ••• 190`), plus your own entry. |
 | `POST /api/directory {numbers[]}` | Contact matching: exact/`endsWith` comparison on normalised digits, never a wildcard dump. |
 | `GET /api/wallets` · `POST /api/wallets` | Linked provider accounts; `{action:"primary"}` switches the default funding wallet, `{action:"link", provider, msisdn}` adds one. |
-| `GET /api/enroll` · `POST /api/enroll` | Business self-enrolment: types, cities and the newest listings; a valid enrolment becomes a payable payee immediately. |
+| `GET /api/enroll` · `POST /api/enroll` | Business self-enrolment: types, school levels, cities and the newest listings. A valid enrolment — including `schoolLevel` for schools and a 4-digit `pin` — becomes a payable payee immediately. |
 | `GET /api/export?type=ledger` · `?type=recipients` | Your payments, or an aggregated list of who you paid. |
 | `GET /api/reasons?merchantId=` · `POST /api/reasons` | The reasons a payee publishes, and the editor behind them (merchant terminal or portal). |
 | `POST /api/business` | `{code, pin}` signs a payee into its portal and returns a scoped 8-hour token; `{action:"data", token, filters}` returns that payee's records only. |
@@ -139,18 +139,27 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
   user can change at any time on the Wallet screen (web and Expo); the pay sheet still lets you override it per payment.
   Switching the default moves no money — queued offline vouchers stay bound to the wallet that signed them.
 - **Self-enrolment.** A shop, utility, school, hospital, bank or telecom lists itself on `/join`: name, type, city,
-  neighbourhood and a phone number. It is written as a payee with `kind`/`category`, `enrolledAt` and `verified: false`
-  (the listing shows a `new` badge until a reviewer checks the registration). From then on it is findable in the app and
-  payable with a fingerprint — no parallel pipeline, no separate settlement path.
+  neighbourhood, a phone number and its own 4-digit portal PIN. It is written as a payee with `kind`/`category`,
+  `enrolledAt` and `verified: false` (the listing shows a `new` badge until a reviewer checks the registration). From then
+  on it is findable in the app and payable with a fingerprint — no parallel pipeline, no separate settlement path.
+- **Primary, secondary or university.** A school must say which it is, because the answer decides what the payer is
+  asked for: a primary or secondary school publishes reasons that collect a **class** (`Form 4 B`), while a university's
+  tuition, registration and transcript reasons collect **faculty → department → year**. The portal then groups by exactly
+  those fields, so the same value that was typed at the counter is the one the bursar filters on.
+- **Codes are issued, PINs are chosen.** The five-character payee code is minted by the server — from an unambiguous
+  alphabet (no `I`, `O`, `0`, `1`) and checked against both the live payee list and `secrets.issuedCodes`, a permanent
+  ledger of every code ever issued, so a code is never reused for a different organisation even if a listing is withdrawn.
+  The business only chooses the PIN that opens its portal, typed twice at enrolment and stored as a scrypt hash. Nobody
+  can pick a code, and nobody but the business knows its PIN.
 - **Reasons for payment.** A payee can publish up to eight reasons (school fees, library books, exam fees, …). The payer
   picks one in the amount composer; if the reason is flagged *asks student*, the app also asks who the payment is for.
-  Both fields travel with the signed request onto the receipt (`txn.reason`, `txn.payerFor`) and into the ledger CSV, so a
-  school can reconcile fees from the terminal or the export. Schools, clinics and utilities start with a template and edit
+  Both fields, plus any cohort details the reason asks for (`txn.payerFor`, `txn.payerDetails`), travel with the signed
+  request onto the receipt and into the ledger CSV, so a school can reconcile fees from the terminal or the export. Schools, clinics and utilities start with a template and edit
   it under **Payment reasons** in the terminal; the directory hands the list to both apps, so the dropdown is always the
   payee's current list. Reasons are validated server-side — an unknown reason, or a student-name reason without a name, is
   rejected when the request is minted.
-- **Business portal.** `/business` is the payee's own seat: sign in with the five-character payee code plus a 4-digit
-  access PIN (demo default `2468`; enrolment stores its own hash). The session is a signed, 8-hour, payee-scoped token —
+- **Business portal.** `/business` is the payee's own seat: sign in with the five-character payee code plus the 4-digit
+  PIN chosen at enrolment (seeded demo payees use `2468` until they change it). The session is a signed, 8-hour, payee-scoped token —
   a school can only ever read payments addressed to it, and the customer wallet, biometrics and history are not visible
   there. The portal shows received volume, today's takings, and every payment with its reason, the student named on it,
   the customer who paid, the receipt and the channel. Records are grouped by reason, class, faculty, department or year

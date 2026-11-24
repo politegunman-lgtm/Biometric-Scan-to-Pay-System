@@ -12,20 +12,51 @@ interface EnrolType {
   label: string;
   kind: "business" | "service";
   category: MerchantCategory;
+  asksSchoolLevel?: boolean;
+}
+
+interface SchoolLevel {
+  id: "primary" | "secondary" | "university";
+  label: string;
+  hint: string;
 }
 
 interface EnrolMeta {
   types: EnrolType[];
+  levels: SchoolLevel[];
   cities: string[];
   newest: { id: string; name: string; category: MerchantCategory; tagline: string | null }[];
 }
 
 interface EnrolResult {
-  merchant: { id: string; name: string; code: string; category: MerchantCategory; city: string };
+  merchant: {
+    id: string;
+    name: string;
+    code: string;
+    category: MerchantCategory;
+    city: string;
+    schoolLevel: string | null;
+  };
   message: string;
 }
 
-const EMPTY = { name: "", type: "shop", city: "Yaoundé", area: "", phone: "", about: "" };
+const LEVEL_LABEL: Record<string, string> = {
+  primary: "Primary school",
+  secondary: "Secondary school",
+  university: "University",
+};
+
+const EMPTY = {
+  name: "",
+  type: "shop",
+  city: "Yaoundé",
+  area: "",
+  phone: "",
+  about: "",
+  schoolLevel: "secondary",
+  pin: "",
+  pinConfirm: "",
+};
 
 export default function JoinPage() {
   const [meta, setMeta] = useState<EnrolMeta | null>(null);
@@ -34,13 +65,25 @@ export default function JoinPage() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<EnrolResult | null>(null);
 
+  const needsLevel = meta?.types.find((t) => t.id === form.type)?.asksSchoolLevel ?? false;
+  const pinMismatch = form.pinConfirm.length === 4 && form.pin !== form.pinConfirm;
+  const canSubmit =
+    form.name.trim().length >= 2 && /^\d{4}$/.test(form.pin) && form.pin === form.pinConfirm && !busy;
+
   useEffect(() => {
     void apiJson<EnrolMeta>("/api/enroll")
       .then((data) => {
         setMeta(data);
         setForm((f) => ({ ...f, city: data.cities[0] ?? "Yaoundé" }));
       })
-      .catch(() => setMeta({ types: [], cities: ["Yaoundé"], newest: [] }));
+      .catch(() =>
+        setMeta({
+          types: [],
+          levels: [],
+          cities: ["Yaoundé"],
+          newest: [],
+        }),
+      );
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -50,6 +93,7 @@ export default function JoinPage() {
     try {
       const res = await apiJson<EnrolResult>("/api/enroll", { method: "POST", body: JSON.stringify(form) });
       setDone(res);
+      setForm((f) => ({ ...f, pin: "", pinConfirm: "" }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not enrol this business");
     } finally {
@@ -112,14 +156,34 @@ export default function JoinPage() {
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600 }}>{done.merchant.name} is live</div>
                   <div className="tiny muted">
-                    Payee code {done.merchant.code} · {done.merchant.city} · portal PIN 2468 (demo default)
+                    {done.merchant.city}
+                    {done.merchant.schoolLevel ? ` · ${LEVEL_LABEL[done.merchant.schoolLevel] ?? done.merchant.schoolLevel}` : ""} · the
+                    PIN you chose
                   </div>
                 </div>
+              </div>
+
+              <div className="panel" style={{ padding: 14, background: "rgba(255,203,5,.06)", borderColor: "rgba(255,203,5,.28)" }}>
+                <div className="row-between">
+                  <div>
+                    <div className="up">your payee code</div>
+                    <div style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: ".16em", marginTop: 2 }}>
+                      {done.merchant.code}
+                    </div>
+                  </div>
+                  <span className="badge accent">issued by Scan to Pay</span>
+                </div>
+                <p className="tiny muted" style={{ marginTop: 8, lineHeight: 1.55 }}>
+                  This code is generated for this organisation alone and is never reissued to another business. Sign in with
+                  it and the 4-digit PIN you just set — we never ask anyone to pick their own code, and the PIN is yours to
+                  change.
+                </p>
               </div>
               <p className="small muted" style={{ lineHeight: 1.6 }}>
                 Schools, clinics and utilities start with a ready-made list of <strong>reasons for payment</strong> — edit it
                 in the merchant terminal under <em>Payment reasons</em>; reasons flagged <em>asks student</em> also prompt the
-                payer for a student name. Customers can now find this business in the app&apos;s <strong>Bills</strong> tab,
+                payer for a student name. A university&rsquo;s reasons ask for faculty, department and year; a primary or
+                secondary school&rsquo;s ask for the class. Customers can now find this business in the app&apos;s <strong>Bills</strong> tab,
                 enter an amount and pay with a fingerprint. Nothing about the payment pipeline changes: a signed request is minted, the biometric match and the
                 fraud engine run, and the receipt is issued. The listing shows a <em>new</em> badge until a reviewer confirms the
                 registration.
@@ -185,6 +249,28 @@ export default function JoinPage() {
                 </select>
               </div>
 
+              {needsLevel && (
+                <div className="field">
+                  <label htmlFor="biz-level">Which kind of school?</label>
+                  <select
+                    id="biz-level"
+                    className="select"
+                    value={form.schoolLevel}
+                    onChange={(e) => setForm({ ...form, schoolLevel: e.target.value })}
+                  >
+                    {(meta?.levels ?? []).map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="tiny muted">
+                    {(meta?.levels ?? []).find((l) => l.id === form.schoolLevel)?.hint ??
+                      "Decides whether payers are asked for a class or for faculty, department and year."}
+                  </span>
+                </div>
+              )}
+
               <div className="row gap-10">
                 <div className="field grow">
                   <label htmlFor="biz-city">City</label>
@@ -240,13 +326,57 @@ export default function JoinPage() {
                 />
               </div>
 
+              <div className="hairline" />
+
+              <div className="row-between">
+                <h2 style={{ fontSize: 14 }}>Portal access</h2>
+                <span className="badge muted">code issued by us · PIN set by you</span>
+              </div>
+              <div className="row gap-10">
+                <div className="field grow">
+                  <label htmlFor="biz-pin">Choose a 4-digit PIN</label>
+                  <input
+                    id="biz-pin"
+                    className="input"
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="new-password"
+                    placeholder="••••"
+                    value={form.pin}
+                    maxLength={4}
+                    onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                    required
+                  />
+                </div>
+                <div className="field grow">
+                  <label htmlFor="biz-pin2">Repeat the PIN</label>
+                  <input
+                    id="biz-pin2"
+                    className="input"
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="new-password"
+                    placeholder="••••"
+                    value={form.pinConfirm}
+                    maxLength={4}
+                    onChange={(e) => setForm({ ...form, pinConfirm: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                    required
+                  />
+                </div>
+              </div>
+              <span className="tiny muted" style={{ marginTop: -6 }}>
+                {pinMismatch
+                  ? "The two PINs do not match yet."
+                  : "Your payee code is minted by the system when you submit; you only choose the PIN that opens your portal. Seeded demo payees use 2468 until they set their own."}
+              </span>
+
               {error && (
                 <div className="row gap-8 tiny" style={{ color: "var(--coral)", alignItems: "center" }}>
                   <Icon name="alert" size={13} /> {error}
                 </div>
               )}
 
-              <button className="btn primary block" type="submit" disabled={busy || form.name.trim().length < 2}>
+              <button className="btn primary block" type="submit" disabled={!canSubmit}>
                 <Icon name="plus" size={15} />
                 {busy ? "Listing…" : "List this business"}
               </button>

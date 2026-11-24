@@ -1,8 +1,9 @@
 import { randomId, sha256Hex } from "./crypto";
 import { PROVIDER_META, ADAPTERS } from "./providers";
+import { setPortalPin } from "./portal";
 import { defaultReasonsFor } from "./reasons";
 import { nowIso, pushAudit, type Database } from "./store";
-import type { GeoPoint, Merchant, MerchantCategory, ProviderId, Txn, Wallet } from "./types";
+import type { GeoPoint, Merchant, MerchantCategory, ProviderId, SchoolLevel, Txn, Wallet } from "./types";
 
 /**
  * Account-side operations that are not part of a payment:
@@ -129,15 +130,32 @@ export function linkWallet(db: Database, input: LinkWalletInput) {
 
 export type EnrolType = "shop" | "supermarket" | "utility" | "school" | "hospital" | "bank" | "telecom" | "other";
 
-export const ENROL_TYPES: { id: EnrolType; label: string; kind: "business" | "service"; category: MerchantCategory }[] = [
+export const ENROL_TYPES: {
+  id: EnrolType;
+  label: string;
+  kind: "business" | "service";
+  category: MerchantCategory;
+  /** Education payees must say which level they are, because it decides the fields. */
+  asksSchoolLevel?: boolean;
+}[] = [
   { id: "shop", label: "Shop / restaurant", kind: "business", category: "retail" },
   { id: "supermarket", label: "Supermarket", kind: "business", category: "groceries" },
   { id: "utility", label: "Utility (water, power)", kind: "service", category: "utilities" },
-  { id: "school", label: "School / university", kind: "service", category: "education" },
+  { id: "school", label: "School / university", kind: "service", category: "education", asksSchoolLevel: true },
   { id: "hospital", label: "Clinic / hospital", kind: "service", category: "health" },
   { id: "bank", label: "Bank / microfinance", kind: "service", category: "banking" },
   { id: "telecom", label: "Telecom / airtime", kind: "service", category: "telecom" },
   { id: "other", label: "Something else", kind: "service", category: "retail" },
+];
+
+/**
+ * Which kind of school. Primary and secondary schools collect a class;
+ * universities collect faculty → department → year.
+ */
+export const SCHOOL_LEVELS: { id: SchoolLevel; label: string; hint: string }[] = [
+  { id: "primary", label: "Primary", hint: "Class, e.g. Class 6" },
+  { id: "secondary", label: "Secondary / high school", hint: "Form or class, e.g. Form 4 B" },
+  { id: "university", label: "University", hint: "Faculty, department and year" },
 ];
 
 const CITIES: Record<string, GeoPoint> = {
@@ -165,15 +183,26 @@ function slugify(name: string) {
     .slice(0, 18);
 }
 
-/** 5 characters, unambiguous alphabet, collision-checked against the payee list. */
-function uniqueCode(db: Database, seed: string) {
+/**
+ * A payee code is minted by the system, never chosen by the business: 5
+ * characters from an unambiguous alphabet (no I/O/0/1, so it survives being
+ * read aloud or written on a receipt). Every code is checked against the live
+ * payee list *and* the ledger of codes already issued, so a code is never
+ * reused for a different organisation.
+ */
+export function uniquePayeeCode(db: Database, seed: string) {
+  const secrets = db.secrets as Database["secrets"] & { issuedCodes?: string[] };
+  const issued = new Set(secrets.issuedCodes ?? []);
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let salt = 0;
   for (;;) {
     const hex = sha256Hex(`${seed}:${salt}`);
     let code = "";
     for (let i = 0; i < 5; i += 1) code += alphabet[parseInt(hex.slice(i * 2, i * 2 + 2), 16) % alphabet.length];
-    if (!db.merchants.some((m) => m.code === code)) return code;
+    if (!issued.has(code) && !db.merchants.some((m) => m.code === code)) {
+      secrets.issuedCodes = [...issued, code];
+      return code;
+    }
     salt += 1;
   }
 }
@@ -185,6 +214,11 @@ export interface EnrolInput {
   area?: unknown;
   phone?: unknown;
   about?: unknown;
+  /** primary | secondary | university — required when type is "school". */
+  schoolLevel?: unknown;
+  /** 4-digit portal PIN, chosen by the business itself. */
+  pin?: unknown;
+  pinConfirm?: unknown;
 }
 
 export function enrolMerchant(db: Database, input: EnrolInput) {
@@ -193,6 +227,24 @@ export function enrolMerchant(db: Database, input: EnrolInput) {
 
   const kindMeta = ENROL_TYPES.find((t) => t.id === input.type);
   if (!kindMeta) throw new Error("Choose what kind of business this is");
+
+  // Which school it is decides whether payers are asked for a class or for
+  // faculty/department/year, so the business has to say.
+  let schoolLevel: SchoolLevel | undefined;
+  if (kindMeta.asksSchoolLevel) {
+    const wanted = String(input.schoolLevel ?? "");
+    const level = SCHOOL_LEVELS.find((l) => l.id === wanted);
+    if (!level) throw new Error("Say whether this is a primary school, secondary school or university");
+    schoolLevel = level.id;
+  }
+
+  // The PIN is the business's own — the system issues the code, they choose the
+  // PIN. Confirmation fields catch a typo before it locks them out.
+  const pin = String(input.pin ?? "");
+  if (!/^\d{4}$/.test(pin)) throw new Error("Choose a 4-digit access PIN for the business portal");
+  if (input.pinConfirm !== undefined && String(input.pinConfirm) !== pin) {
+    throw new Error("The two PINs do not match");
+  }
 
   const cityKey = String(input.city ?? "").toLowerCase().replace(/[^a-z]/g, "");
   const geo = CITIES[cityKey] ?? CITIES.yaounde;
@@ -216,7 +268,7 @@ export function enrolMerchant(db: Database, input: EnrolInput) {
   const slug = slugify(name) || "business";
   const merchant: Merchant = {
     id: `mer_${slug}_${sha256Hex(name + msisdn).slice(0, 6)}`,
-    code: uniqueCode(db, name + msisdn),
+    code: uniquePayeeCode(db, name + msisdn),
     name,
     category: kindMeta.category,
     msisdn,
@@ -233,15 +285,17 @@ export function enrolMerchant(db: Database, input: EnrolInput) {
     ownerMsisdn: msisdn,
     // Schools, clinics and utilities start with a sensible reason list that
     // they can edit in the terminal.
-    paymentReasons: defaultReasonsFor(kindMeta.category, kindMeta.kind),
+    paymentReasons: defaultReasonsFor(kindMeta.category, kindMeta.kind, schoolLevel),
+    ...(schoolLevel ? { schoolLevel } : {}),
   };
+  setPortalPin(merchant, pin);
   db.merchants.unshift(merchant);
   pushAudit(
     db,
     {
       actor: `merchant:${merchant.id}`,
       action: "merchant.enroll",
-      detail: `${merchant.name} enrolled as ${kindMeta.label} (${geo.city}) · pending verification`,
+      detail: `${merchant.name} enrolled as ${kindMeta.label}${schoolLevel ? ` (${schoolLevel})` : ""} (${geo.city}) · pending verification`,
       severity: "info",
     },
     randomId("aud"),
@@ -256,6 +310,9 @@ export function enrolMerchant(db: Database, input: EnrolInput) {
       tagline: merchant.tagline,
       city: merchant.geo.city,
       verified: merchant.verified,
+      schoolLevel: merchant.schoolLevel ?? null,
+      /** True: the business chose this PIN itself; the code above was issued by us. */
+      pinSetByBusiness: true,
     },
     message: `${merchant.name} is now payable in the app`,
   };

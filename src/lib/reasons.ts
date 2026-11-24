@@ -1,4 +1,4 @@
-import type { Merchant, MerchantCategory, PayerDetails, PayerField, PaymentReason } from "./types";
+import type { Merchant, MerchantCategory, PayerDetails, PayerField, PaymentReason, SchoolLevel } from "./types";
 
 /**
  * Reason-for-payment catalogue.
@@ -67,11 +67,21 @@ const BY_CATEGORY: Partial<Record<MerchantCategory, PaymentReason[]>> = {
 export function reasonsFor(merchant: Merchant): PaymentReason[] {
   if (merchant.paymentReasons) return merchant.paymentReasons;
   if (merchant.kind === "person") return [];
-  return BY_CATEGORY[merchant.category] ?? [];
+  return defaultReasonsFor(merchant.category, merchant.kind, merchant.schoolLevel);
 }
 
-export function defaultReasonsFor(category: MerchantCategory, kind?: Merchant["kind"]): PaymentReason[] {
+/**
+ * The starting list for a newly enrolled payee. A university gets tuition-style
+ * reasons (faculty, department, year); a primary or secondary school gets fee
+ * reasons that ask for the class — the same fields its portal will group by.
+ */
+export function defaultReasonsFor(
+  category: MerchantCategory,
+  kind?: Merchant["kind"],
+  schoolLevel?: SchoolLevel,
+): PaymentReason[] {
   if (kind === "person") return [];
+  if (category === "education" && schoolLevel === "university") return UNIVERSITY_REASONS;
   return BY_CATEGORY[category] ?? [];
 }
 

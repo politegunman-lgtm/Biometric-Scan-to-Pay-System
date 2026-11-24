@@ -34,6 +34,12 @@ export interface DbSecrets {
   nextCounter: Record<string, number>;
   /** Counters the settlement server has already consumed (replay guard). */
   consumedCounters: Record<string, number[]>;
+  /**
+   * Every payee code the system has ever issued. Codes are never handed out
+   * twice, even if a listing is later withdrawn, so a code always maps to one
+   * organisation for its lifetime.
+   */
+  issuedCodes?: string[];
 }
 
 export interface Database {

@@ -171,6 +171,65 @@ async function main() {
     );
   }
 
+  console.log("\n── Enrolment, codes and the business portal ────────────");
+  const vocab = await api<any>("/api/enroll");
+  check("three school levels offered", vocab.levels?.length === 3, vocab.levels?.map((l: any) => l.id).join(", "));
+
+  const missingLevel = await api<any>("/api/enroll", {
+    method: "POST",
+    body: JSON.stringify({ name: `Smoke School ${Date.now() % 100000}`, type: "school", phone: "690112233", pin: "8642" }),
+  });
+  check("a school must pick its level", Boolean(missingLevel.error), missingLevel.error);
+
+  const stamp = Date.now() % 1000000;
+  const enrolledSchool = await api<any>("/api/enroll", {
+    method: "POST",
+    body: JSON.stringify({
+      name: `Smoke University ${stamp}`,
+      type: "school",
+      schoolLevel: "university",
+      city: "Yaoundé",
+      phone: `6 9${String(stamp).padStart(7, "0").slice(0, 7)}`,
+      pin: "8642",
+      pinConfirm: "8642",
+    }),
+  });
+  check(
+    "school enrols with its own PIN",
+    Boolean(enrolledSchool.merchant?.code),
+    enrolledSchool.error ?? enrolledSchool.merchant?.code,
+  );
+  const code = String(enrolledSchool.merchant?.code ?? "");
+  check("code is 5 characters, system-issued", /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/.test(code), code);
+  check(
+    "university level recorded",
+    enrolledSchool.merchant?.schoolLevel === "university",
+    enrolledSchool.merchant?.schoolLevel,
+  );
+
+  const wrongPin = await api<any>("/api/business", {
+    method: "POST",
+    body: JSON.stringify({ code, pin: "2468" }),
+  });
+  check("the demo PIN does not open an enrolled payee", Boolean(wrongPin.error), wrongPin.error);
+
+  const session = await api<any>("/api/business", {
+    method: "POST",
+    body: JSON.stringify({ code, pin: "8642" }),
+  });
+  check("business signs in with its chosen PIN", Boolean(session.token), session.payee?.name);
+  const view = await api<any>("/api/business", {
+    method: "POST",
+    body: JSON.stringify({ action: "data", token: session.token, filters: { groupBy: "faculty" } }),
+  });
+  check(
+    "portal shows only that payee, empty and scoped",
+    view.stats?.received === 0 && view.payee?.code === code,
+    `${view.payee?.name} · ${view.reasons?.length ?? 0} reasons`,
+  );
+  const portalCsv = await fetch(`${BASE}/api/business/export?token=${encodeURIComponent(session.token)}`).then((r) => r.text());
+  check("portal CSV header", portalCsv.startsWith("paid_at,receipt,customer,student,reason"), `${portalCsv.split("\n").length - 1} rows`);
+
   console.log("\n── Settings & CSV ──────────────────────────────────────");
   const settings = await api<any>("/api/settings", {
     method: "POST",

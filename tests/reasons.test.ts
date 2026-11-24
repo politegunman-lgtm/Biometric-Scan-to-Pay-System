@@ -121,8 +121,10 @@ test("a school that enrols itself starts with fee reasons", () => {
   const { merchant } = enrolMerchant(db, {
     name: "Institut Bilingue de Mvan",
     type: "school",
+    schoolLevel: "secondary",
     city: "Yaoundé",
     phone: "6 99 55 44 33",
+    pin: "4321",
   });
   const stored = db.merchants.find((m) => m.id === merchant.id)!;
   assert.equal(stored.category, "education");

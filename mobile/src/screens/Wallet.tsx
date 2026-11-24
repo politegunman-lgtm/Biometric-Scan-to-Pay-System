@@ -70,7 +70,12 @@ export function WalletScreen({ onClose }: { onClose: () => void }) {
         <View style={{ width: 34 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+      >
         <Text style={styles.lead}>
           The default wallet funds every payment unless you pick another one on the pay sheet.
         </Text>

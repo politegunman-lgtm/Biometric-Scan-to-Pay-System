@@ -154,6 +154,13 @@ export interface PaymentReason {
   askFields?: PayerField[];
 }
 
+/**
+ * What kind of school a payee is. Chosen at enrolment and used to pick the
+ * reason template: universities collect faculty/department/year, schools collect
+ * a class.
+ */
+export type SchoolLevel = "primary" | "secondary" | "university";
+
 export interface Merchant {
   id: string;
   code: string;
@@ -185,6 +192,8 @@ export interface Merchant {
   paymentReasons?: PaymentReason[];
   /** scrypt hash of the portal access PIN. Absent → the demo PIN applies. */
   portalPin?: { salt: string; hash: string } | null;
+  /** Set for education payees so tuition-style reasons ask for the right fields. */
+  schoolLevel?: SchoolLevel;
 }
 
 export interface PaymentRequest {

@@ -9,6 +9,7 @@ import {
   setPrimaryWallet,
 } from "../src/lib/accounts";
 import { searchDirectory } from "../src/lib/directory";
+import { checkPortalPin, merchantByCode } from "../src/lib/portal";
 import type { Database } from "../src/lib/store";
 
 /**
@@ -76,6 +77,8 @@ test("an enrolled business is searchable, masked and payable", () => {
     area: "Nkoldongo",
     phone: "6 90 11 22 33",
     about: "Pharmacy & consultation",
+    pin: "4321",
+    pinConfirm: "4321",
   });
 
   const stored = db.merchants.find((m) => m.id === merchant.id)!;
@@ -94,14 +97,17 @@ test("an enrolled business is searchable, masked and payable", () => {
 test("enrolment rejects duplicates, bad numbers and missing names", () => {
   const db = freshDb();
   assert.throws(() => enrolMerchant(db, { name: "", type: "shop", phone: "677000111" }), /2–48/);
-  assert.throws(() => enrolMerchant(db, { name: "Shop", type: "shop", phone: "12345" }), /phone number/i);
+  assert.throws(() => enrolMerchant(db, { name: "Shop", type: "shop", phone: "12345", pin: "1234" }), /phone number/i);
   assert.throws(() => enrolMerchant(db, { name: "Nope", type: "spaceship", phone: "677000111" }), /kind of business/i);
   // "ENEO" must collide with the seeded "ENEO Electricity".
-  assert.throws(() => enrolMerchant(db, { name: "ENEO", type: "utility", phone: "677000222" }), /already on Scan to Pay/i);
-  // Same name twice is a duplicate too.
-  enrolMerchant(db, { name: "Boulangerie du Rond Point", type: "shop", phone: "677000333" });
   assert.throws(
-    () => enrolMerchant(db, { name: "boulangerie du rond point", type: "other", phone: "677000444" }),
+    () => enrolMerchant(db, { name: "ENEO", type: "utility", phone: "677000222", pin: "1234" }),
+    /already on Scan to Pay/i,
+  );
+  // Same name twice is a duplicate too.
+  enrolMerchant(db, { name: "Boulangerie du Rond Point", type: "shop", phone: "677000333", pin: "1234" });
+  assert.throws(
+    () => enrolMerchant(db, { name: "boulangerie du rond point", type: "other", phone: "677000444", pin: "1234" }),
     /already on Scan to Pay/i,
   );
 });
@@ -122,4 +128,126 @@ test("recipients aggregate only money that moved", () => {
   }
   // Sorted newest first.
   for (let i = 1; i < rows.length; i += 1) assert.ok(rows[i - 1].lastPaidAt >= rows[i].lastPaidAt);
+});
+
+test("a school says which level it is, and the level picks the reason template", () => {
+  const db = freshDb();
+  assert.throws(
+    () => enrolMerchant(db, { name: "École de Nkolbisson", type: "school", phone: "6 77 12 34 56", pin: "1234" }),
+    /primary school, secondary school or university/i,
+  );
+  assert.throws(
+    () =>
+      enrolMerchant(db, {
+        name: "École de Nkolbisson",
+        type: "school",
+        schoolLevel: "kindergarten",
+        phone: "6 77 12 34 56",
+        pin: "1234",
+      }),
+    /primary school, secondary school or university/i,
+  );
+
+  const uni = enrolMerchant(db, {
+    name: "Institut Universitaire de Douala",
+    type: "school",
+    schoolLevel: "university",
+    city: "Douala",
+    phone: "6 77 22 33 44",
+    pin: "1357",
+  });
+  const uniStored = db.merchants.find((m) => m.id === uni.merchant.id)!;
+  assert.equal(uniStored.schoolLevel, "university");
+  assert.ok(
+    uniStored.paymentReasons?.some((r) => r.id === "tuition" && r.askFields?.includes("faculty")),
+    "university starts with tuition-style reasons",
+  );
+
+  const primary = enrolMerchant(db, {
+    name: "École Primaire de Bonabéri",
+    type: "school",
+    schoolLevel: "primary",
+    city: "Douala",
+    phone: "6 77 55 66 77",
+    pin: "2468",
+  });
+  const primaryStored = db.merchants.find((m) => m.id === primary.merchant.id)!;
+  assert.equal(primaryStored.schoolLevel, "primary");
+  assert.ok(primaryStored.paymentReasons?.some((r) => r.askFields?.includes("class")));
+  assert.ok(!primaryStored.paymentReasons?.some((r) => r.askFields?.includes("faculty")));
+});
+
+test("the system mints payee codes and never reuses one", () => {
+  const db = freshDb();
+  const seen = new Set(db.merchants.map((m) => m.code));
+  const alphabet = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/;
+  // Fresh numbers each time: enrolment refuses a number already on the network.
+  const phone = () => `6 9${String(1000000 + Math.floor(Math.random() * 8999999)).slice(0, 7)}`;
+
+  for (let i = 0; i < 40; i += 1) {
+    const { merchant } = enrolMerchant(db, {
+      name: `Test Business ${String(i).padStart(2, "0")}`,
+      type: "shop",
+      phone: phone(),
+      pin: "1234",
+    });
+    assert.match(merchant.code, alphabet);
+    assert.ok(!seen.has(merchant.code), `code ${merchant.code} was reused`);
+    seen.add(merchant.code);
+  }
+
+  // A code that was issued before (even for a payee no longer listed) stays retired.
+  const retired = db.merchants.at(-1)!.code;
+  db.merchants = db.merchants.filter((m) => m.code !== retired);
+  assert.ok(db.secrets.issuedCodes?.includes(retired));
+  for (let i = 0; i < 30; i += 1) {
+    const { merchant } = enrolMerchant(db, {
+      name: `Another Shop ${String(i).padStart(2, "0")}`,
+      type: "shop",
+      phone: phone(),
+      pin: "1234",
+    });
+    assert.notEqual(merchant.code, retired);
+  }
+});
+
+test("the business chooses its own PIN and signs in with it", () => {
+  const db = freshDb();
+  assert.throws(
+    () => enrolMerchant(db, { name: "No Pin Ltd", type: "shop", phone: "6 79 11 22 33" }),
+    /4-digit access PIN/i,
+  );
+  assert.throws(
+    () =>
+      enrolMerchant(db, { name: "Bad Pin Ltd", type: "shop", phone: "6 79 11 22 33", pin: "12" }),
+    /4-digit access PIN/i,
+  );
+  assert.throws(
+    () =>
+      enrolMerchant(db, {
+        name: "Mismatch Ltd",
+        type: "shop",
+        phone: "6 79 11 22 33",
+        pin: "1357",
+        pinConfirm: "1358",
+      }),
+    /do not match/i,
+  );
+
+  const { merchant } = enrolMerchant(db, {
+    name: "Boutique Essos",
+    type: "shop",
+    city: "Yaoundé",
+    phone: "6 79 44 55 66",
+    pin: "9081",
+    pinConfirm: "9081",
+  });
+  const stored = db.merchants.find((m) => m.id === merchant.id)!;
+  assert.ok(stored.portalPin, "PIN is stored as a hash");
+  assert.ok(!JSON.stringify(stored.portalPin).includes("9081"), "plaintext PIN is never stored");
+
+  const found = merchantByCode(db, merchant.code.toLowerCase());
+  assert.equal(found?.id, merchant.id, "codes are matched case-insensitively");
+  assert.equal(checkPortalPin(found!, "9081"), true);
+  assert.equal(checkPortalPin(found!, "2468"), false, "the demo PIN does not open an enrolled payee");
 });

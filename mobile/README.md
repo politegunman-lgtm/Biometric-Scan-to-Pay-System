@@ -106,6 +106,13 @@ Settings → **Open the business portal** opens `/business` in the browser: a pa
 sees only its own payments — grouped by reason, class, faculty, department or year, with a CSV export. That is deliberate:
 the phone is the customer's wallet, the browser is the business's ledger. Editing reasons lives there too.
 
+## Typing in sheets
+
+The amount composer and the Settings sheet lift clear of the on-screen keyboard: on Android a transparent modal gets its
+own window, so the activity's resize never reaches it — the app measures the keyboard and shrinks/lifts the sheet itself,
+caps it to the space above the keyboard, and scrolls the field you tapped into view. The Android manifest is also set to
+`softwareKeyboardLayoutMode: "resize"` for standalone builds.
+
 ## Notes and limits
 
 - **A physical device is required** for meaningful testing: simulators have no camera and only fake biometrics.

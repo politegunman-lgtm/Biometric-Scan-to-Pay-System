@@ -1,5 +1,5 @@
 import { mutateDb, readDb } from "@/lib/store";
-import { ENROL_TYPES, cityOptions, enrolMerchant, type EnrolInput } from "@/lib/accounts";
+import { ENROL_TYPES, SCHOOL_LEVELS, cityOptions, enrolMerchant, type EnrolInput } from "@/lib/accounts";
 import { handleRoute, readBody } from "@/lib/http";
 import { toEntry } from "@/lib/directory";
 
@@ -15,7 +15,7 @@ export async function GET() {
       .sort((a, b) => (a.enrolledAt! < b.enrolledAt! ? 1 : -1))
       .slice(0, 6)
       .map(toEntry);
-    return { ok: true, types: ENROL_TYPES, cities: cityOptions(), newest };
+    return { ok: true, types: ENROL_TYPES, levels: SCHOOL_LEVELS, cities: cityOptions(), newest };
   });
 }
 

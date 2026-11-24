@@ -19,7 +19,7 @@ const API_ROWS: [string, string, string][] = [
   ["GET /api/export", "Ledger", "CSV of the full transaction history with risk + auth metadata; `?type=recipients` aggregates who you paid."],
   ["GET|POST /api/directory", "Payees", "Search people, billers and shops (masked numbers), or match phone contacts against registered numbers."],
   ["POST /api/wallets", "Payment options", "Choose the default funding wallet, or link another provider account."],
-  ["GET|POST /api/enroll", "Onboarding", "A business lists itself as a payee; it becomes payable in-app immediately, pending verification."],
+  ["GET|POST /api/enroll", "Onboarding", "A business lists itself as a payee — school level for education payees, and its own 4-digit portal PIN; the payee code is issued by the server. Payable in-app immediately, pending verification."],
   ["GET|POST /api/reasons", "Reasons", "The reason catalogue a payee publishes (school fees, library books…), including which reasons ask for a student name or cohort details."],
   ["POST /api/business", "Payee portal", "Code + PIN sign-in returning a payee-scoped token; the same endpoint returns that payee's payment records grouped and filtered."],
   ["GET /api/business/export", "Payee CSV", "The portal's current view as CSV (student, reason, class/faculty/department/year, amount, receipt)."],
