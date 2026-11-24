@@ -15,13 +15,27 @@ import {
 import QRCode from "react-native-qrcode-svg";
 import { apiJson } from "../lib/api";
 import { CATEGORY_LABEL, expiryLabel, money } from "../lib/format";
-import type { Directory, PayTarget, Payee, PaymentReason, PaymentRequest } from "../lib/types";
+import type { Directory, PayTarget, Payee, PayerDetails, PayerField, PaymentReason, PaymentRequest } from "../lib/types";
 import { useApp } from "../state";
 import { Badge, Button, Card, colors, Icon } from "../ui";
 
 type Mode = "scan" | "people" | "bills";
 
 const QUICK = [1_000, 2_000, 5_000, 10_000];
+
+const FIELD_LABEL: Record<PayerField, string> = {
+  class: "Class",
+  faculty: "Faculty",
+  department: "Department",
+  year: "Year",
+};
+
+const PLACEHOLDER: Record<PayerField, string> = {
+  class: "e.g. Form 4 B",
+  faculty: "e.g. Faculty of Science",
+  department: "e.g. Computer Science",
+  year: "e.g. Year 2",
+};
 
 /** Pull the payee out of any payload a Scan to Pay code can carry. */
 export function parsePayCode(raw: string): { kind: "request" | "person"; id: string } | null {
@@ -67,6 +81,7 @@ export function Scan({
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState<PaymentReason | null>(null);
   const [payerFor, setPayerFor] = useState("");
+  const [payerDetails, setPayerDetails] = useState<PayerDetails>({});
   const [sending, setSending] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [contactState, setContactState] = useState<"idle" | "loading" | "done" | "denied">("idle");
@@ -185,6 +200,12 @@ export function Scan({
       setMessage(`Enter the student's name for "${reason.label}"`);
       return;
     }
+    for (const field of reason?.askFields ?? []) {
+      if (!String(payerDetails[field] ?? "").trim()) {
+        setMessage(`${FIELD_LABEL[field]} is required for "${reason!.label}"`);
+        return;
+      }
+    }
     setSending(true);
     try {
       const res = await apiJson<{ request: PaymentRequest }>("/api/merchant", {
@@ -195,12 +216,16 @@ export function Scan({
           note: composer.kind === "person" ? "P2P transfer" : "Bill payment",
           reasonId: reason?.id,
           payerFor: reason?.askStudent ? payerFor.trim() : undefined,
+          payerDetails: reason?.askFields?.length
+            ? Object.fromEntries(reason.askFields.map((f) => [f, payerDetails[f] ?? ""]))
+            : undefined,
         }),
       });
       setComposer(null);
       setAmount("");
       setReason(null);
       setPayerFor("");
+      setPayerDetails({});
       await refresh();
       onPay({
         requestId: res.request.id,
@@ -453,6 +478,7 @@ export function Scan({
           setComposer(null);
           setReason(null);
           setPayerFor("");
+          setPayerDetails({});
         }}
       >
         <View style={styles.backdrop}>
@@ -462,6 +488,7 @@ export function Scan({
               setComposer(null);
               setReason(null);
               setPayerFor("");
+              setPayerDetails({});
             }}
           />
           <View style={styles.sheet}>
@@ -511,6 +538,7 @@ export function Scan({
                             onPress={() => {
                               setReason(active ? null : r);
                               if (!r.askStudent) setPayerFor("");
+                              setPayerDetails({});
                             }}
                           >
                             <Text style={[styles.reasonText, active && { color: colors.text }]}>{r.label}</Text>
@@ -532,6 +560,19 @@ export function Scan({
                         />
                       </>
                     )}
+                    {(reason?.askFields ?? []).map((field) => (
+                      <View key={field} style={{ marginTop: 8 }}>
+                        <Text style={styles.composerLabel}>{FIELD_LABEL[field].toUpperCase()}</Text>
+                        <TextInput
+                          style={styles.fieldInput}
+                          value={payerDetails[field] ?? ""}
+                          onChangeText={(v) => setPayerDetails((current) => ({ ...current, [field]: v }))}
+                          placeholder={PLACEHOLDER[field]}
+                          placeholderTextColor={colors.muted}
+                          maxLength={40}
+                        />
+                      </View>
+                    ))}
                   </>
                 )}
 

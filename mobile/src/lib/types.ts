@@ -64,6 +64,7 @@ export interface Txn {
   reason?: string;
   reasonId?: string;
   payerFor?: string;
+  payerDetails?: PayerDetails;
   channel?: string;
   provider?: string;
   walletId?: string;
@@ -114,10 +115,20 @@ export interface AppState {
   serverTime: string;
 }
 
+export type PayerField = "class" | "faculty" | "department" | "year";
+
+export interface PayerDetails {
+  class?: string;
+  faculty?: string;
+  department?: string;
+  year?: string;
+}
+
 export interface PaymentReason {
   id: string;
   label: string;
   askStudent?: boolean;
+  askFields?: PayerField[];
 }
 
 export interface Payee {

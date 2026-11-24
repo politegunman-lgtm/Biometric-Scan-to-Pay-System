@@ -294,9 +294,13 @@ export default function WalletPage() {
             <Icon name="user" size={14} />
             Recipients &amp; downloads
           </Link>
-          <Link href="/merchant" className="btn ghost sm" style={{ justifyContent: "flex-start" }}>
+          <Link href="/business" className="btn ghost sm" style={{ justifyContent: "flex-start" }}>
             <Icon name="store" size={14} />
-            Open merchant terminal
+            Business portal (payee sign-in)
+          </Link>
+          <Link href="/merchant" className="btn ghost sm" style={{ justifyContent: "flex-start" }}>
+            <Icon name="qr" size={14} />
+            Counter terminal
           </Link>
           <Link href="/docs" className="btn ghost sm" style={{ justifyContent: "flex-start" }}>
             <Icon name="layers" size={14} />

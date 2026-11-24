@@ -155,6 +155,10 @@ export default function MerchantTerminalPage() {
             </span>
             {data?.network.label ?? "3G"}
           </span>
+          <Link href="/business" className="btn ghost sm">
+            <Icon name="store" size={13} />
+            Business portal
+          </Link>
           <Link href="/" className="btn ghost sm">
             <Icon name="chevron-left" size={14} />
             Wallet app

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { defaultBase } from "../lib/api";
 import { relativeTime } from "../lib/format";
 import { useApp } from "../state";
@@ -45,6 +45,22 @@ export function Settings({ visible, onClose }: { visible: boolean; onClose: () =
             </Card>
 
             <View style={{ height: 18 }} />
+            <Text style={styles.label}>BUSINESS</Text>
+            <Card>
+              <Text style={styles.hint}>
+                Run a shop, school or utility? The business portal shows only that payee&rsquo;s records: every payment,
+                grouped by reason, class, faculty, department or year, with a CSV export.
+              </Text>
+              <Button
+                label="Open the business portal"
+                variant="soft"
+                icon="store"
+                onPress={() => void Linking.openURL(`${base.replace(/\/$/, "")}/business`)}
+                style={{ marginTop: 10 }}
+              />
+              <Text style={styles.hint}>Sign in with the payee code and the 4-digit access PIN.</Text>
+            </Card>
+
             <Text style={styles.label}>WALLET SERVICE ADDRESS</Text>
             <TextInput
               style={styles.input}

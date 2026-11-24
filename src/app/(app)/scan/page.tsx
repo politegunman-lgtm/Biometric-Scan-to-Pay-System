@@ -6,9 +6,9 @@ import { MerchantAvatar } from "@/components/MerchantAvatar";
 import { Icon } from "@/components/icons";
 import { EmptyState } from "@/components/controls";
 import { apiJson, sleep } from "@/lib/client";
-import { reasonsFor } from "@/lib/reasons";
+import { PAYER_FIELDS, reasonsFor } from "@/lib/reasons";
 import { CATEGORY_META, money, relativeTime } from "@/lib/format";
-import type { PaymentRequest } from "@/lib/types";
+import type { PayerDetails, PayerField, PaymentReason, PaymentRequest } from "@/lib/types";
 
 interface Payee {
   id: string;
@@ -22,7 +22,7 @@ interface Payee {
   code: string;
   msisdnMasked: string;
   isNew?: boolean;
-  reasons: { id: string; label: string; askStudent?: boolean }[];
+  reasons: PaymentReason[];
 }
 
 interface Directory {
@@ -53,6 +53,7 @@ export default function ScanPage() {
   const [sendAmount, setSendAmount] = useState("");
   const [reasonId, setReasonId] = useState<string>("");
   const [payerFor, setPayerFor] = useState("");
+  const [payerDetails, setPayerDetails] = useState<PayerDetails>({});
   const [sending, setSending] = useState(false);
   const [origin, setOrigin] = useState("");
 
@@ -183,6 +184,12 @@ export default function ScanPage() {
       toast(`Enter the student's name for "${reason.label}"`, "warn");
       return;
     }
+    for (const field of reason?.askFields ?? []) {
+      if (!String(payerDetails[field] ?? "").trim()) {
+        toast(`${PAYER_FIELDS.find((f) => f.id === field)?.label ?? field} is required for "${reason!.label}"`, "warn");
+        return;
+      }
+    }
     setSending(true);
     try {
       const res = await apiJson<{ request: PaymentRequest }>("/api/merchant", {
@@ -193,6 +200,9 @@ export default function ScanPage() {
           note,
           reasonId: reasonId || undefined,
           payerFor: reason?.askStudent ? payerFor.trim() : undefined,
+          payerDetails: reason?.askFields?.length
+            ? Object.fromEntries(reason.askFields.map((f) => [f, payerDetails[f] ?? ""]))
+            : undefined,
         }),
       });
       await refresh();
@@ -200,6 +210,7 @@ export default function ScanPage() {
       setSendAmount("");
       setReasonId("");
       setPayerFor("");
+      setPayerDetails({});
       openPay({
         requestId: res.request.id,
         merchantId: res.request.merchantId,
@@ -500,6 +511,28 @@ export default function ScanPage() {
                       <span className="tiny muted">Appears on the receipt so the school can match the payment to a student.</span>
                     </div>
                   )}
+                  {(payee.reasons.find((r) => r.id === reasonId)?.askFields ?? []).map((field) => {
+                    const meta = PAYER_FIELDS.find((f) => f.id === field)!;
+                    const examples: Record<PayerField, string> = {
+                      class: "e.g. Form 4 B",
+                      faculty: "e.g. Faculty of Science",
+                      department: "e.g. Computer Science",
+                      year: "e.g. Year 2",
+                    };
+                    return (
+                      <div className="field" key={field} style={{ marginTop: 10 }}>
+                        <label htmlFor={`payer-${field}`}>{meta.label}</label>
+                        <input
+                          id={`payer-${field}`}
+                          className="input"
+                          placeholder={examples[field]}
+                          value={payerDetails[field] ?? ""}
+                          maxLength={40}
+                          onChange={(e) => setPayerDetails((current) => ({ ...current, [field]: e.target.value }))}
+                        />
+                      </div>
+                    );
+                  })}
                 </>
               )}
 
@@ -537,6 +570,7 @@ export default function ScanPage() {
                         setSendAmount("");
                         setReasonId("");
                         setPayerFor("");
+                        setPayerDetails({});
                         window.setTimeout(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
                       }}
                     >
@@ -618,6 +652,7 @@ export default function ScanPage() {
                       setSendAmount("");
                       setReasonId("");
                       setPayerFor("");
+                      setPayerDetails({});
                       window.setTimeout(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
                     }}
                   >

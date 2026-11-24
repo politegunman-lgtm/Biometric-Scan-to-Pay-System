@@ -111,7 +111,9 @@ export default function JoinPage() {
                 </span>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600 }}>{done.merchant.name} is live</div>
-                  <div className="tiny muted">Payee code {done.merchant.code} · {done.merchant.city}</div>
+                  <div className="tiny muted">
+                    Payee code {done.merchant.code} · {done.merchant.city} · portal PIN 2468 (demo default)
+                  </div>
                 </div>
               </div>
               <p className="small muted" style={{ lineHeight: 1.6 }}>
@@ -127,9 +129,13 @@ export default function JoinPage() {
                   <Icon name="fingerprint" size={13} />
                   Pay it as a customer
                 </Link>
-                <Link className="btn soft sm" href="/merchant">
+                <Link className="btn soft sm" href="/business">
+                  <Icon name="store" size={13} />
+                  Open the business portal
+                </Link>
+                <Link className="btn ghost sm" href="/merchant">
                   <Icon name="qr" size={13} />
-                  Open its terminal
+                  Counter terminal
                 </Link>
                 <button
                   className="btn ghost sm"

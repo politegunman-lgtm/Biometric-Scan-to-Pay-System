@@ -134,12 +134,24 @@ export interface User {
   pinSet: boolean;
 }
 
+/** Extra facts a university or school wants at payment time. */
+export type PayerField = "class" | "faculty" | "department" | "year";
+
+export interface PayerDetails {
+  class?: string;
+  faculty?: string;
+  department?: string;
+  year?: string;
+}
+
 /** A reason for payment published by a payee (school fees, library fees, …). */
 export interface PaymentReason {
   id: string;
   label: string;
   /** Ask who the payment is for — school fees name the student. */
   askStudent?: boolean;
+  /** Ask which class / faculty / department / year the student is in. */
+  askFields?: PayerField[];
 }
 
 export interface Merchant {
@@ -171,6 +183,8 @@ export interface Merchant {
    * category template (schools, clinics, utilities); `[]` means "none".
    */
   paymentReasons?: PaymentReason[];
+  /** scrypt hash of the portal access PIN. Absent → the demo PIN applies. */
+  portalPin?: { salt: string; hash: string } | null;
 }
 
 export interface PaymentRequest {
@@ -180,6 +194,8 @@ export interface PaymentRequest {
   reasonId?: string;
   /** Who the payment is for, when the reason asks (a student's name). */
   payerFor?: string;
+  /** Class / faculty / department / year, when the reason asks. */
+  payerDetails?: PayerDetails;
   merchantId: string;
   merchantName: string;
   merchantCode: string;
@@ -265,6 +281,10 @@ export interface Txn {
   reasonId?: string;
   /** Student/beneficiary name for reasons that ask who the payment is for. */
   payerFor?: string;
+  /** Class / faculty / department / year, when the reason asks. */
+  payerDetails?: PayerDetails;
+  /** The wallet owner who paid (the customer), for the payee's reconciliation. */
+  payerName?: string;
   ref: string;
   receiptNo: string;
   merchantId: string;

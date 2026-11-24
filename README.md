@@ -109,7 +109,8 @@ with your own QR, contact discovery, provider choice at payment time, audit trai
 | 13 | `/join` → list a business | It appears in the app's **Bills** tab with a `new` badge; pick it, enter an amount, authorise with a fingerprint. |
 | 14 | **Activity → Recipients** | Who you paid, how often and how much, with **Pay again** and a recipients CSV. |
 | 15 | **Bills → Lycée Leclerc** | Pick a reason (**School fees**), type the student's name, pay. The reason and name land on the receipt and in the terminal's list. |
-| 16 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
+| 16 | `/business` → code **A2DE5**, PIN **2468** | The school's own seat: fees grouped by reason and class, search by student, CSV of the exact view. Université de Yaoundé I (**0133E**) adds faculty, department and year. |
+| 17 | `/merchant` on a computer, app on a phone | Enter an amount → **Generate QR**, then point the phone camera at it: the link opens `/scan?req=…` and lands on that exact request. Pay, and the terminal flips to **PAID** within 3 s. |
 
 ### Payees, billers and people
 
@@ -128,7 +129,9 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
 | `GET /api/wallets` · `POST /api/wallets` | Linked provider accounts; `{action:"primary"}` switches the default funding wallet, `{action:"link", provider, msisdn}` adds one. |
 | `GET /api/enroll` · `POST /api/enroll` | Business self-enrolment: types, cities and the newest listings; a valid enrolment becomes a payable payee immediately. |
 | `GET /api/export?type=ledger` · `?type=recipients` | Your payments, or an aggregated list of who you paid. |
-| `GET /api/reasons?merchantId=` · `POST /api/reasons` | The reasons a payee publishes, and the editor behind them (merchant terminal). |
+| `GET /api/reasons?merchantId=` · `POST /api/reasons` | The reasons a payee publishes, and the editor behind them (merchant terminal or portal). |
+| `POST /api/business` | `{code, pin}` signs a payee into its portal and returns a scoped 8-hour token; `{action:"data", token, filters}` returns that payee's records only. |
+| `GET /api/business/export?token=…` | The current filtered view as CSV (student, reason, class, faculty, department, year, amount, receipt). |
 
 ### Payment options, business enrolment and recipients
 
@@ -146,6 +149,15 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
   it under **Payment reasons** in the terminal; the directory hands the list to both apps, so the dropdown is always the
   payee's current list. Reasons are validated server-side — an unknown reason, or a student-name reason without a name, is
   rejected when the request is minted.
+- **Business portal.** `/business` is the payee's own seat: sign in with the five-character payee code plus a 4-digit
+  access PIN (demo default `2468`; enrolment stores its own hash). The session is a signed, 8-hour, payee-scoped token —
+  a school can only ever read payments addressed to it, and the customer wallet, biometrics and history are not visible
+  there. The portal shows received volume, today's takings, and every payment with its reason, the student named on it,
+  the customer who paid, the receipt and the channel. Records are grouped by reason, class, faculty, department or year
+  and clickable to filter; the same filters drive **Export view** (CSV).
+- **It is not a student database.** Nothing is enrolled twice: the class/faculty/department/year values are captured once,
+  at payment time, on the signed request, and the portal is a projection over the resulting transactions. That keeps the
+  school's reconciliation honest without asking anyone to maintain a registry inside the app.
 - **Recipients.** Activity groups settled and queued payments per payee, so you can see who you have paid, how often and
   in what total, **Pay again** the last amount, or download the recipients as CSV. The Expo app offers the same data in a
   payment detail sheet with a share sheet for the CSV and for an individual receipt.
@@ -219,8 +231,9 @@ The web app is untouched by it — the folder is a separate app that only consum
 src/app/(app)/          phone shell: home, scan, activity, security, wallet
 src/app/merchant/       merchant terminal (signed QR requests)
 src/app/join/           business self-enrolment (list a payee)
+src/app/business/       business portal (payee sign-in, records, reasons, CSV)
 src/app/docs/           in-app architecture & API document
-src/app/api/            state, pay, biometric, merchant, directory, wallets, enroll, reasons, sync, network, fraud, settings, devices, export, qr
+src/app/api/            state, pay, biometric, merchant, directory, wallets, enroll, reasons, business, sync, network, fraud, settings, devices, export, qr
 src/lib/biometrics.ts   matching, liveness, sensor synthesis
 src/lib/fraud.ts        scoring engine, family caps, hard rules, baseline learner
 src/lib/offline.ts      voucher protocol, settlement checks, transport ladder
@@ -229,7 +242,8 @@ src/lib/crypto.ts       AES-256-GCM seals, Ed25519, scrypt, HMAC
 src/lib/store.ts        atomic JSON persistence + seed
 src/lib/providers.ts    MTN MoMo / Orange Money / Express Union adapters
 src/lib/accounts.ts     wallet linking / default wallet, business enrolment, recipients
-src/lib/reasons.ts      reason-for-payment catalogue, validation, student-name rule
+src/lib/reasons.ts      reason-for-payment catalogue, validation, student-name/cohort rules
+src/lib/portal.ts       payee-scoped tokens, record filtering + grouping, portal CSV
 src/components/         app shell, pay sheet, biometric pad, charts, risk UI
 tests/                  unit tests (fraud, offline, biometrics, crypto, accounts)
 scripts/smoke.mts       end-to-end API walkthrough

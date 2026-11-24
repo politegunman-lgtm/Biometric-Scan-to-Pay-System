@@ -62,13 +62,16 @@ test("resolving a reason enforces the student-name rule", () => {
   const db = freshDb();
   const lycee = school(db);
 
-  const fees = resolveReason(lycee, "school_fees", "  Marie   Claire Ngo ");
+  const fees = resolveReason(lycee, "school_fees", "  Marie   Claire Ngo ", { class: " Form 4 B " });
   assert.equal(fees.reason, "School fees");
   assert.equal(fees.reasonId, "school_fees");
   assert.equal(fees.payerFor, "Marie Claire Ngo");
+  assert.deepEqual(fees.payerDetails, { class: "Form 4 B" });
 
   assert.throws(() => resolveReason(lycee, "school_fees"), /student's name/i);
   assert.throws(() => resolveReason(lycee, "school_fees", " "), /student's name/i);
+  // The class is part of this school's reason, so it is required too.
+  assert.throws(() => resolveReason(lycee, "school_fees", "Marie Claire Ngo"), /Class is required/i);
   assert.throws(() => resolveReason(lycee, "nonsense"), /not offered/i);
   assert.throws(() => resolveReason(lycee, undefined, "Marie"), /Choose a reason/i);
 
@@ -85,15 +88,27 @@ test("the signed request carries the reason and beneficiary name", () => {
     amountXAF: 25_000,
     reasonId: "library_books",
     payerFor: "Marie Claire Ngo",
+    payerDetails: { class: "Form 4 B" },
   });
   assert.equal(request.reason, "Library books");
   assert.equal(request.reasonId, "library_books");
   assert.equal(request.payerFor, "Marie Claire Ngo");
+  assert.equal(request.payerDetails?.class, "Form 4 B");
   assert.ok(request.signature.length > 20);
 
   assert.throws(
     () => createPaymentRequest(db, { merchantId: "svc_lycee", amountXAF: 25_000, reasonId: "school_fees" }),
     /student's name/i,
+  );
+  assert.throws(
+    () =>
+      createPaymentRequest(db, {
+        merchantId: "svc_lycee",
+        amountXAF: 25_000,
+        reasonId: "school_fees",
+        payerFor: "Marie Claire Ngo",
+      }),
+    /Class is required/i,
   );
   assert.throws(
     () => createPaymentRequest(db, { merchantId: "mer_mfoundi", amountXAF: 2_000, reasonId: "school_fees", payerFor: "X" }),

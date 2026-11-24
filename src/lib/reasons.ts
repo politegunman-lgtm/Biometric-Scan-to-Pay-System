@@ -1,4 +1,4 @@
-import type { Merchant, MerchantCategory, PaymentReason } from "./types";
+import type { Merchant, MerchantCategory, PayerDetails, PayerField, PaymentReason } from "./types";
 
 /**
  * Reason-for-payment catalogue.
@@ -15,13 +15,28 @@ import type { Merchant, MerchantCategory, PaymentReason } from "./types";
 const MAX_REASONS = 8;
 const MAX_LABEL = 40;
 
+export const PAYER_FIELDS: { id: PayerField; label: string; short: string }[] = [
+  { id: "class", label: "Class", short: "Class" },
+  { id: "faculty", label: "Faculty", short: "Faculty" },
+  { id: "department", label: "Department", short: "Dept" },
+  { id: "year", label: "Year of study", short: "Year" },
+];
+
 export const SCHOOL_REASONS: PaymentReason[] = [
-  { id: "school_fees", label: "School fees", askStudent: true },
-  { id: "library_books", label: "Library books", askStudent: true },
-  { id: "library_fees", label: "Library fees", askStudent: true },
-  { id: "registration", label: "Registration", askStudent: true },
-  { id: "exam_fees", label: "Exam fees", askStudent: true },
-  { id: "uniform", label: "Uniform & kit", askStudent: true },
+  { id: "school_fees", label: "School fees", askStudent: true, askFields: ["class"] },
+  { id: "library_books", label: "Library books", askStudent: true, askFields: ["class"] },
+  { id: "library_fees", label: "Library fees", askStudent: true, askFields: ["class"] },
+  { id: "registration", label: "Registration", askStudent: true, askFields: ["class"] },
+  { id: "exam_fees", label: "Exam fees", askStudent: true, askFields: ["class"] },
+  { id: "uniform", label: "Uniform & kit", askStudent: true, askFields: ["class"] },
+];
+
+/** Universities need faculty → department → year, not a single class. */
+export const UNIVERSITY_REASONS: PaymentReason[] = [
+  { id: "tuition", label: "Tuition", askStudent: true, askFields: ["faculty", "department", "year"] },
+  { id: "registration", label: "Registration", askStudent: true, askFields: ["faculty", "department", "year"] },
+  { id: "transcript", label: "Transcript", askStudent: true, askFields: ["faculty", "department", "year"] },
+  { id: "hostel", label: "Hostel fees", askStudent: true, askFields: ["year"] },
 ];
 
 export const CLINIC_REASONS: PaymentReason[] = [
@@ -79,7 +94,7 @@ export function normaliseReasons(input: unknown): PaymentReason[] {
   const usedLabels = new Set<string>();
 
   for (const raw of input) {
-    const item = (raw ?? {}) as { id?: unknown; label?: unknown; askStudent?: unknown };
+    const item = (raw ?? {}) as { id?: unknown; label?: unknown; askStudent?: unknown; askFields?: unknown };
     const label = String(item.label ?? "").trim().replace(/\s+/g, " ");
     if (label.length < 2) throw new Error("Every reason needs a label of at least 2 characters");
     if (label.length > MAX_LABEL) throw new Error(`Keep reason labels under ${MAX_LABEL} characters`);
@@ -93,7 +108,14 @@ export function normaliseReasons(input: unknown): PaymentReason[] {
     while (usedIds.has(id)) id = `${slug(label)}_${n++}`;
     usedIds.add(id);
 
-    out.push({ id, label, askStudent: Boolean(item.askStudent) });
+    const rawFields = Array.isArray(item.askFields) ? item.askFields : [];
+    const askFields = PAYER_FIELDS.map((f) => f.id).filter((id) => rawFields.includes(id));
+    out.push({
+      id,
+      label,
+      askStudent: Boolean(item.askStudent),
+      ...(askFields.length ? { askFields } : {}),
+    });
   }
   return out;
 }
@@ -102,6 +124,7 @@ export interface ResolvedReason {
   reasonId?: string;
   reason?: string;
   payerFor?: string;
+  payerDetails?: PayerDetails;
 }
 
 /**
@@ -110,7 +133,12 @@ export interface ResolvedReason {
  * dropped: a school reconciling fees must not receive a payment tagged with a
  * reason it never published.
  */
-export function resolveReason(merchant: Merchant, reasonId?: string, payerFor?: string): ResolvedReason {
+export function resolveReason(
+  merchant: Merchant,
+  reasonId?: string,
+  payerFor?: string,
+  payerDetails?: PayerDetails,
+): ResolvedReason {
   if (!reasonId) {
     if (payerFor && payerFor.trim()) {
       throw new Error("Choose a reason before naming who the payment is for");
@@ -121,9 +149,24 @@ export function resolveReason(merchant: Merchant, reasonId?: string, payerFor?: 
   if (!reason) throw new Error("That reason is not offered by this payee");
 
   const who = (payerFor ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
-  if (reason.askStudent) {
-    if (who.length < 2) throw new Error(`Enter the student's name for "${reason.label}"`);
-    return { reasonId: reason.id, reason: reason.label, payerFor: who };
+  if (reason.askStudent && who.length < 2) {
+    throw new Error(`Enter the student's name for "${reason.label}"`);
   }
-  return { reasonId: reason.id, reason: reason.label };
+
+  const details: PayerDetails = {};
+  for (const field of reason.askFields ?? []) {
+    const value = String(payerDetails?.[field] ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
+    if (value.length < 1) {
+      const label = PAYER_FIELDS.find((f) => f.id === field)?.label ?? field;
+      throw new Error(`${label} is required for "${reason.label}"`);
+    }
+    details[field] = value;
+  }
+
+  return {
+    reasonId: reason.id,
+    reason: reason.label,
+    ...(reason.askStudent ? { payerFor: who } : {}),
+    ...(Object.keys(details).length ? { payerDetails: details } : {}),
+  };
 }

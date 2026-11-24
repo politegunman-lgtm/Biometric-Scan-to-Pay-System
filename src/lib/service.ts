@@ -35,6 +35,7 @@ import {
 } from "./store";
 import { computeStats } from "./stats";
 import { resolveReason } from "./reasons";
+import type { PayerDetails } from "./types";
 import { NETWORK_PRESETS, transportFor } from "./transport";
 import { money } from "./format";
 import type {
@@ -63,6 +64,7 @@ export interface PayInput {
   note?: string;
   reasonId?: string;
   payerFor?: string;
+  payerDetails?: PayerDetails;
   walletId?: string;
   fingerId?: string;
   sample?: number[];
@@ -190,11 +192,12 @@ export function createPaymentRequest(
     ttlMinutes?: number;
     reasonId?: string;
     payerFor?: string;
+    payerDetails?: PayerDetails;
   },
 ): PaymentRequest {
   const merchant = db.merchants.find((m) => m.id === input.merchantId);
   if (!merchant) throw new Error("Unknown merchant");
-  const chosen = resolveReason(merchant, input.reasonId, input.payerFor);
+  const chosen = resolveReason(merchant, input.reasonId, input.payerFor, input.payerDetails);
   const amount = Math.round(input.amountXAF);
   if (!Number.isFinite(amount) || amount < 100 || amount > 2_000_000) {
     throw new Error("Amount must be between 100 and 2,000,000 FCFA");
@@ -215,6 +218,7 @@ export function createPaymentRequest(
     reason: chosen.reason,
     reasonId: chosen.reasonId,
     payerFor: chosen.payerFor,
+    payerDetails: chosen.payerDetails,
     createdAt: createdAt.toISOString(),
     expiresAt: new Date(exp).toISOString(),
     nonce,
@@ -277,6 +281,7 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
   let reason: string | undefined;
   let reasonId: string | undefined;
   let payerFor: string | undefined;
+  let payerDetails: PayerDetails | undefined;
   let request: PaymentRequest | undefined;
   let channel: PaymentChannel = input.channel ?? "qr-scan";
 
@@ -308,16 +313,18 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
     reason = request.reason;
     reasonId = request.reasonId;
     payerFor = request.payerFor;
+    payerDetails = request.payerDetails;
     channel = request.channel;
   }
 
   if (!merchant) return { status: "error", message: "Unknown merchant", errorCode: "unknown-merchant" };
   if (!request && (input.reasonId || input.payerFor)) {
     try {
-      const chosen = resolveReason(merchant, input.reasonId, input.payerFor);
+      const chosen = resolveReason(merchant, input.reasonId, input.payerFor, input.payerDetails);
       reason = chosen.reason;
       reasonId = chosen.reasonId;
       payerFor = chosen.payerFor;
+      payerDetails = chosen.payerDetails;
     } catch (err) {
       return { status: "error", message: (err as Error).message, errorCode: "bad-reason" };
     }
@@ -471,7 +478,7 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
   if (risk.decision === "block") {
     const txn = finaliseTxn(db, {
       merchant, amount, request, risk, auth, geo: merchant.geo, note,
-      reason, reasonId, payerFor,
+      reason, reasonId, payerFor, payerDetails,
       channel: offlineChannel, offline: effectiveOffline, wallet: payWallet,
       deviceLabel: device.label, at, status: "declined", id: randomId("txn"),
     });
@@ -517,7 +524,7 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
     return queueOffline(db, {
       wallet: payWallet, merchant, amount, request, risk, auth, biometric,
       channel: input.channel === "offline-sms" ? "offline-sms" : "offline-qr",
-      note, reason, reasonId, payerFor, device, at,
+      note, reason, reasonId, payerFor, payerDetails, device, at,
     });
   }
 
@@ -548,7 +555,7 @@ export async function authorizePayment(db: Database, input: PayInput): Promise<P
   payWallet.balanceXAF = charge.balanceAfterXAF;
   const txn = finaliseTxn(db, {
     merchant, amount, request, risk, auth, geo: merchant.geo, note,
-    reason, reasonId, payerFor,
+    reason, reasonId, payerFor, payerDetails,
     channel: offlineChannel, offline: false, wallet: payWallet, deviceLabel: device.label,
     at, status: "settled", id: txnId,
   });
@@ -593,6 +600,7 @@ function finaliseTxn(
     reason?: string;
     reasonId?: string;
     payerFor?: string;
+    payerDetails?: PayerDetails;
     channel: PaymentChannel;
     offline: boolean;
     wallet: Database["wallets"][number];
@@ -625,6 +633,9 @@ function finaliseTxn(
     reason: args.reason,
     reasonId: args.reasonId,
     payerFor: args.payerFor,
+    payerDetails: args.payerDetails,
+    // The payee needs to know which customer paid, not just the student name.
+    payerName: db.user.fullName,
     createdAt: args.at.toISOString(),
     settledAt: args.status === "settled" ? args.at.toISOString() : null,
     syncedAt: args.status === "settled" ? args.at.toISOString() : null,
@@ -661,6 +672,7 @@ function queueOffline(
     reason?: string;
     reasonId?: string;
     payerFor?: string;
+    payerDetails?: PayerDetails;
     device: Database["devices"][number];
     at: Date;
   },

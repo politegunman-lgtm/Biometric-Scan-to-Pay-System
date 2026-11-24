@@ -90,11 +90,11 @@ const SERVICES: Omit<Merchant, "code">[] = [
   { id: "svc_superu", name: "Super U Yaoundé", category: "groceries", msisdn: "+237677220011", geo: YAOUNDE, riskScore: 10, flagged: false, logoHue: 110, verified: true, kind: "service", tagline: "In-store checkout" },
   { id: "svc_mahima", name: "Mahima Supermarket", category: "groceries", msisdn: "+237699551177", geo: YAOUNDE, riskScore: 9, flagged: false, logoHue: 60, verified: true, kind: "service", tagline: "In-store checkout" },
   { id: "svc_lycee", name: "Lycée Leclerc", category: "education", msisdn: "+237655440099", geo: YAOUNDE, riskScore: 6, flagged: false, logoHue: 250, verified: true, kind: "service", tagline: "School fees · term 2", paymentReasons: [
-    { id: "school_fees", label: "School fees", askStudent: true },
-    { id: "library_books", label: "Library books", askStudent: true },
-    { id: "library_fees", label: "Library fees", askStudent: true },
-    { id: "exam_fees", label: "Exam fees", askStudent: true },
-    { id: "uniform", label: "Uniform & kit", askStudent: true },
+    { id: "school_fees", label: "School fees", askStudent: true, askFields: ["class"] },
+    { id: "library_books", label: "Library books", askStudent: true, askFields: ["class"] },
+    { id: "library_fees", label: "Library fees", askStudent: true, askFields: ["class"] },
+    { id: "exam_fees", label: "Exam fees", askStudent: true, askFields: ["class"] },
+    { id: "uniform", label: "Uniform & kit", askStudent: true, askFields: ["class"] },
   ] },
   { id: "svc_hopital", name: "Hôpital Central", category: "health", msisdn: "+237677660088", geo: YAOUNDE, riskScore: 6, flagged: false, logoHue: 160, verified: true, kind: "service", tagline: "Consultation & pharmacy", paymentReasons: [
     { id: "consultation", label: "Consultation" },
@@ -105,10 +105,10 @@ const SERVICES: Omit<Merchant, "code">[] = [
   { id: "svc_afriland", name: "Afriland First Bank", category: "banking", msisdn: "+237655770010", geo: YAOUNDE, riskScore: 4, flagged: false, logoHue: 210, verified: true, kind: "service", tagline: "Account deposit · transfer" },
   { id: "svc_ecobank", name: "Ecobank Cameroon", category: "banking", msisdn: "+237677990020", geo: DOUALA, riskScore: 5, flagged: false, logoHue: 170, verified: true, kind: "service", tagline: "Account deposit · transfer" },
   { id: "svc_uy1", name: "Université de Yaoundé I", category: "education", msisdn: "+237699120030", geo: YAOUNDE, riskScore: 7, flagged: false, logoHue: 265, verified: true, kind: "service", tagline: "Tuition · registration fees", paymentReasons: [
-    { id: "tuition", label: "Tuition", askStudent: true },
-    { id: "registration", label: "Registration", askStudent: true },
-    { id: "transcript", label: "Transcript", askStudent: true },
-    { id: "hostel", label: "Hostel fees", askStudent: true },
+    { id: "tuition", label: "Tuition", askStudent: true, askFields: ["faculty", "department", "year"] },
+    { id: "registration", label: "Registration", askStudent: true, askFields: ["faculty", "department", "year"] },
+    { id: "transcript", label: "Transcript", askStudent: true, askFields: ["faculty", "department", "year"] },
+    { id: "hostel", label: "Hostel fees", askStudent: true, askFields: ["year"] },
   ] },
 ];
 

@@ -100,6 +100,12 @@ Pick a school, clinic or utility in **Bills** and the composer shows its reasons
 signed request onto the receipt and into the school's terminal, so fees can be reconciled per student. Businesses edit
 their list in the web terminal (*Payment reasons*); the phone always reads the current list from the directory.
 
+## Business side
+
+Settings → **Open the business portal** opens `/business` in the browser: a payee signs in with its code and 4-digit PIN and
+sees only its own payments — grouped by reason, class, faculty, department or year, with a CSV export. That is deliberate:
+the phone is the customer's wallet, the browser is the business's ledger. Editing reasons lives there too.
+
 ## Notes and limits
 
 - **A physical device is required** for meaningful testing: simulators have no camera and only fake biometrics.

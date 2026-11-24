@@ -171,6 +171,11 @@ export function Activity({ onPay }: { onPay: (target: PayTarget) => void }) {
                 {[
                   ...(detail.reason ? [["Reason", detail.reason] as [string, string]] : []),
                   ...(detail.payerFor ? [["Paid for", detail.payerFor] as [string, string]] : []),
+                  ...(detail.payerDetails
+                    ? (Object.entries(detail.payerDetails) as [string, string][])
+                        .filter(([, v]) => v)
+                        .map(([k, v]) => [k.charAt(0).toUpperCase() + k.slice(1), v] as [string, string])
+                    : []),
                   ["Receipt", detail.receiptNo ?? "—"],
                   ["Reference", detail.ref],
                   ["When", `${clockTime(detail.createdAt)} · ${relativeTime(detail.createdAt)}`],
