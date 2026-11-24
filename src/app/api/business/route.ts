@@ -1,3 +1,12 @@
+import {
+  businessProfile,
+  closeListing,
+  deleteListing,
+  reopenListing,
+  rotatePortalPin,
+  updateBusiness,
+  type BusinessPatch,
+} from "@/lib/businessAdmin";
 import { mutateDb } from "@/lib/store";
 import { checkPortalPin, issuePortalToken, merchantByCode, portalView, readPortalToken, type PortalFilters } from "@/lib/portal";
 import { handleRoute, readBody } from "@/lib/http";
@@ -28,21 +37,61 @@ export function GET() {
 }
 
 /**
- * POST /api/business — two actions:
- *   { code, pin }        sign in, returns a scoped 8-hour token
- *   { token, filters }   read this payee's records (grouped/filtered)
+ * POST /api/business — every action is scoped to the payee the token names:
+ *   { code, pin }                  sign in, returns a scoped 8-hour token
+ *   { action:"data", token, filters }  read this payee's records
+ *   { action:"settings", token, patch } edit the business, its level and its cohort lists
+ *   { action:"pin", token, pin }   rotate the access PIN
+ *   { action:"close" | "reopen", token }  pause / resume taking payments
+ *   { action:"delete", token, confirm }   remove the listing (receipts are kept)
  */
 export async function POST(req: Request) {
   const body = await readBody<{
-    action?: "signin" | "data";
+    action?: "signin" | "data" | "settings" | "pin" | "close" | "reopen" | "delete";
     code?: string;
     pin?: string;
     token?: string;
     filters?: PortalFilters;
+    patch?: BusinessPatch;
+    confirm?: string;
   }>(req);
 
   return handleRoute("business:post", () =>
     mutateDb((db) => {
+      // Everything below reads the payee from the token, never from the body.
+      const scoped = () => {
+        const merchantId = readPortalToken(db, body.token);
+        if (!merchantId) throw new Error("Your portal session expired — sign in again");
+        const merchant = db.merchants.find((m) => m.id === merchantId);
+        if (!merchant) throw new Error("Payee no longer listed");
+        return merchant;
+      };
+
+      if (body.action === "settings") {
+        const merchant = scoped();
+        const profile = updateBusiness(db, merchant, body.patch ?? {});
+        return { ok: true, profile, message: "Business details updated" };
+      }
+      if (body.action === "pin") {
+        const merchant = scoped();
+        return { ok: true, ...rotatePortalPin(db, merchant, body.pin) };
+      }
+      if (body.action === "close") {
+        const merchant = scoped();
+        const result = closeListing(db, merchant);
+        return { ok: true, ...result, profile: businessProfile(merchant) };
+      }
+      if (body.action === "reopen") {
+        const merchant = scoped();
+        const result = reopenListing(db, merchant);
+        return { ok: true, ...result, profile: businessProfile(merchant) };
+      }
+      if (body.action === "delete") {
+        const merchant = scoped();
+        const result = deleteListing(db, merchant, body.confirm);
+        return { ok: true, ...result };
+      }
+
       if (body.action === "data") {
         const merchantId = readPortalToken(db, body.token);
         if (!merchantId) throw new Error("Your portal session expired — sign in again");

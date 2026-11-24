@@ -131,6 +131,12 @@ export interface PaymentReason {
   askFields?: PayerField[];
 }
 
+export interface CohortCatalogue {
+  faculties: { name: string; departments: string[] }[];
+  years: string[];
+  classes: string[];
+}
+
 export interface Payee {
   id: string;
   name: string;
@@ -144,6 +150,10 @@ export interface Payee {
   msisdnMasked: string;
   onPlatform?: boolean;
   reasons?: PaymentReason[];
+  /** Dropdown options the payee published for faculty / department / class / year. */
+  cohorts?: CohortCatalogue;
+  /** True once the payee saved those lists — the values then have to come from them. */
+  cohortsPublished?: boolean;
 }
 
 export interface Directory {

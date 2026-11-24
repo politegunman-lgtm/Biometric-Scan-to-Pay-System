@@ -230,6 +230,73 @@ async function main() {
   const portalCsv = await fetch(`${BASE}/api/business/export?token=${encodeURIComponent(session.token)}`).then((r) => r.text());
   check("portal CSV header", portalCsv.startsWith("paid_at,receipt,customer,student,reason"), `${portalCsv.split("\n").length - 1} rows`);
 
+  const published = await api<any>("/api/business", {
+    method: "POST",
+    body: JSON.stringify({
+      action: "settings",
+      token: session.token,
+      patch: {
+        tagline: "Smoke test faculty lists",
+        cohorts: {
+          faculties: [{ name: "Faculty of Science", departments: ["Computer Science", "Mathematics"] }],
+          years: ["Year 1", "Year 2"],
+        },
+      },
+    }),
+  });
+  check(
+    "portal publishes faculty and department lists",
+    published.profile?.cohorts?.faculties?.[0]?.departments?.length === 2,
+    published.error ?? published.message,
+  );
+
+  const unknownFaculty = await api<any>("/api/merchant", {
+    method: "POST",
+    body: JSON.stringify({
+      merchantId: enrolledSchool.merchant.id,
+      amountXAF: 5_000,
+      reasonId: "tuition",
+      payerFor: "Smoke Student",
+      payerDetails: { faculty: "Faculty of Magic", department: "Wizardry", year: "Year 1" },
+    }),
+  });
+  check("a value outside the published list is refused", /choose a faculty from the list/i.test(String(unknownFaculty.error)), unknownFaculty.error);
+
+  const listedFaculty = await api<any>("/api/merchant", {
+    method: "POST",
+    body: JSON.stringify({
+      merchantId: enrolledSchool.merchant.id,
+      amountXAF: 5_000,
+      reasonId: "tuition",
+      payerFor: "Smoke Student",
+      payerDetails: { faculty: "faculty of science", department: "computer science", year: "year 2" },
+    }),
+  });
+  check(
+    "a listed faculty is accepted and canonicalised",
+    listedFaculty.request?.payerDetails?.faculty === "Faculty of Science",
+    listedFaculty.error ?? JSON.stringify(listedFaculty.request?.payerDetails ?? {}),
+  );
+
+  const closed = await api<any>("/api/business", {
+    method: "POST",
+    body: JSON.stringify({ action: "close", token: session.token }),
+  });
+  const payClosed = await api<any>("/api/merchant", {
+    method: "POST",
+    body: JSON.stringify({ merchantId: enrolledSchool.merchant.id, amountXAF: 5_000 }),
+  });
+  check(
+    "a closed business takes no payments",
+    Boolean(closed.profile?.closedAt) && /closed its listing/i.test(String(payClosed.error)),
+    payClosed.error,
+  );
+  const reopened = await api<any>("/api/business", {
+    method: "POST",
+    body: JSON.stringify({ action: "reopen", token: session.token }),
+  });
+  check("a business can reopen", reopened.profile?.closedAt === null, reopened.error ?? reopened.message);
+
   console.log("\n── Settings & CSV ──────────────────────────────────────");
   const settings = await api<any>("/api/settings", {
     method: "POST",

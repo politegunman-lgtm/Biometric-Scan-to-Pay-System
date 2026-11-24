@@ -62,11 +62,11 @@ test("resolving a reason enforces the student-name rule", () => {
   const db = freshDb();
   const lycee = school(db);
 
-  const fees = resolveReason(lycee, "school_fees", "  Marie   Claire Ngo ", { class: " Form 4 B " });
+  const fees = resolveReason(lycee, "school_fees", "  Marie   Claire Ngo ", { class: " Form 4 " });
   assert.equal(fees.reason, "School fees");
   assert.equal(fees.reasonId, "school_fees");
   assert.equal(fees.payerFor, "Marie Claire Ngo");
-  assert.deepEqual(fees.payerDetails, { class: "Form 4 B" });
+  assert.deepEqual(fees.payerDetails, { class: "Form 4" });
 
   assert.throws(() => resolveReason(lycee, "school_fees"), /student's name/i);
   assert.throws(() => resolveReason(lycee, "school_fees", " "), /student's name/i);
@@ -88,12 +88,12 @@ test("the signed request carries the reason and beneficiary name", () => {
     amountXAF: 25_000,
     reasonId: "library_books",
     payerFor: "Marie Claire Ngo",
-    payerDetails: { class: "Form 4 B" },
+    payerDetails: { class: "Form 4" },
   });
   assert.equal(request.reason, "Library books");
   assert.equal(request.reasonId, "library_books");
   assert.equal(request.payerFor, "Marie Claire Ngo");
-  assert.equal(request.payerDetails?.class, "Form 4 B");
+  assert.equal(request.payerDetails?.class, "Form 4");
   assert.ok(request.signature.length > 20);
 
   assert.throws(

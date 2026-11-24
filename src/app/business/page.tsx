@@ -55,8 +55,24 @@ interface PortalPayment {
   provider: string;
 }
 
+interface BusinessProfile {
+  id: string;
+  name: string;
+  code: string;
+  tagline: string;
+  phone: string;
+  city: string;
+  category: MerchantCategory;
+  schoolLevel: "primary" | "secondary" | "university" | null;
+  cohorts: { faculties: { name: string; departments: string[] }[]; years: string[]; classes: string[] };
+  cohortsPublished: boolean;
+  closedAt: string | null;
+  verified: boolean;
+}
+
 interface PortalData {
   payee: PortalPayee;
+  profile: BusinessProfile;
   reasons: PaymentReason[];
   filters: { groupBy?: GroupKey };
   stats: {
@@ -88,6 +104,8 @@ const GROUP_BY: { id: GroupKey; label: string }[] = [
   { id: "year", label: "Year" },
   { id: "day", label: "Day" },
 ];
+
+const CITIES = ["Yaoundé", "Douala", "Bafoussam", "Bamenda", "Garoua", "Buea", "Limbé", "Kribi"];
 
 const FIELD_LABEL: Record<PayerField, string> = {
   class: "Class",
@@ -615,11 +633,385 @@ export default function BusinessPortalPage() {
         )}
       </section>
 
+      {data && (
+        <BusinessSettings
+          token={session.token}
+          profile={data.profile}
+          onSaved={() => void load(session.token)}
+          onDeleted={signOut}
+        />
+      )}
+
       <p className="tiny muted" style={{ marginTop: 14, lineHeight: 1.5 }}>
         Records are the payments themselves — no separate student database. Filter by reason, class, faculty, department or
         year, then export exactly that view as CSV.
       </p>
     </div>
+  );
+}
+
+
+/**
+ * The business editing itself: trading details, school level, the dropdown lists
+ * payers choose from, the access PIN, and the way out of the platform.
+ */
+function BusinessSettings({
+  token,
+  profile,
+  onSaved,
+  onDeleted,
+}: {
+  token: string;
+  profile: BusinessProfile;
+  onSaved: () => void;
+  onDeleted: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(profile.name);
+  const [tagline, setTagline] = useState(profile.tagline);
+  const [phone, setPhone] = useState(profile.phone);
+  const [city, setCity] = useState(profile.city);
+  const [level, setLevel] = useState(profile.schoolLevel ?? "secondary");
+  const [faculties, setFaculties] = useState(profile.cohorts.faculties);
+  const [years, setYears] = useState(profile.cohorts.years.join(", "));
+  const [classes, setClasses] = useState(profile.cohorts.classes.join(", "));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  const [newPin, setNewPin] = useState("");
+  const [newPin2, setNewPin2] = useState("");
+  const [confirmName, setConfirmName] = useState("");
+
+  const education = profile.category === "education";
+  const asList = (value: string) =>
+    value
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+  useEffect(() => {
+    setName(profile.name);
+    setTagline(profile.tagline);
+    setPhone(profile.phone);
+    setCity(profile.city);
+    setLevel(profile.schoolLevel ?? "secondary");
+    setFaculties(profile.cohorts.faculties);
+    setYears(profile.cohorts.years.join(", "));
+    setClasses(profile.cohorts.classes.join(", "));
+  }, [profile]);
+
+  const post = async (body: Record<string, unknown>) => {
+    setBusy(true);
+    setFailure(null);
+    setMessage(null);
+    try {
+      const res = await apiJson<{ message?: string }>("/api/business", {
+        method: "POST",
+        body: JSON.stringify({ token, ...body }),
+      });
+      setMessage(res.message ?? "Saved");
+      onSaved();
+      return true;
+    } catch (err) {
+      setFailure(err instanceof Error ? err.message : "Could not save");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveDetails = () =>
+    void post({
+      action: "settings",
+      patch: {
+        name,
+        tagline,
+        phone,
+        city,
+        ...(education ? { schoolLevel: level } : {}),
+        ...(education
+          ? {
+              cohorts: {
+                faculties: level === "university" ? faculties : [],
+                years: level === "university" ? asList(years) : [],
+                classes: level === "university" ? [] : asList(classes),
+              },
+            }
+          : {}),
+      },
+    });
+
+  return (
+    <section className="panel" style={{ marginTop: 14 }}>
+      <div className="row-between">
+        <div>
+          <h2 style={{ fontSize: 15 }}>Business settings</h2>
+          <p className="tiny muted" style={{ marginTop: 3, lineHeight: 1.5 }}>
+            Your details, your cohort lists (the dropdowns payers choose from) and your PIN — all editable here.
+            {profile.cohortsPublished ? " The lists below are published: payers must pick from them." : ""}
+          </p>
+        </div>
+        <button className="btn ghost sm" type="button" onClick={() => setOpen((v) => !v)}>
+          <Icon name={open ? "chevron-left" : "store"} size={13} />
+          {open ? "Close" : "Edit business"}
+        </button>
+      </div>
+
+      {profile.closedAt && (
+        <div className="row gap-8 tiny" style={{ marginTop: 10, color: "var(--coral)", alignItems: "center" }}>
+          <Icon name="alert" size={13} /> Listing closed {timeLabel(profile.closedAt)} — no new payments are accepted.
+        </div>
+      )}
+
+      {open && (
+        <div className="stack gap-12" style={{ marginTop: 12 }}>
+          <div className="row gap-10" style={{ flexWrap: "wrap" }}>
+            <div className="field grow" style={{ minWidth: 220 }}>
+              <label htmlFor="biz-name-edit">Trading name</label>
+              <input id="biz-name-edit" className="input" value={name} maxLength={48} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="field grow" style={{ minWidth: 200 }}>
+              <label htmlFor="biz-phone-edit">Business mobile</label>
+              <input id="biz-phone-edit" className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="biz-tagline-edit">One line customers see</label>
+            <input
+              id="biz-tagline-edit"
+              className="input"
+              value={tagline}
+              maxLength={70}
+              onChange={(e) => setTagline(e.target.value)}
+            />
+          </div>
+          <div className="row gap-10" style={{ flexWrap: "wrap" }}>
+            <div className="field grow" style={{ minWidth: 160 }}>
+              <label htmlFor="biz-city-edit">City</label>
+              <select id="biz-city-edit" className="select" value={city} onChange={(e) => setCity(e.target.value)}>
+                {CITIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {education && (
+              <div className="field grow" style={{ minWidth: 190 }}>
+                <label htmlFor="biz-level-edit">School level</label>
+                <select
+                  id="biz-level-edit"
+                  className="select"
+                  value={level}
+                  onChange={(e) => setLevel(e.target.value as "primary" | "secondary" | "university")}
+                >
+                  <option value="primary">Primary</option>
+                  <option value="secondary">Secondary / high school</option>
+                  <option value="university">University</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {education && level === "university" && (
+            <div className="stack gap-8">
+              <div className="row-between" style={{ alignItems: "flex-end" }}>
+                <div>
+                  <div className="up">Faculties &amp; departments</div>
+                  <div className="tiny muted">Payers pick a faculty, then a department from that faculty.</div>
+                </div>
+                <button
+                  className="btn ghost xs"
+                  type="button"
+                  onClick={() => setFaculties((current) => [...current, { name: "", departments: [] }])}
+                >
+                  <Icon name="plus" size={11} /> Faculty
+                </button>
+              </div>
+              {faculties.map((faculty, index) => (
+                <div key={index} className="stack gap-6" style={{ padding: 10, border: "1px solid var(--line)", borderRadius: 12 }}>
+                  <div className="row gap-8" style={{ alignItems: "center" }}>
+                    <input
+                      className="input grow"
+                      placeholder="Faculty of Science"
+                      maxLength={40}
+                      value={faculty.name}
+                      onChange={(e) =>
+                        setFaculties((current) => current.map((f, i) => (i === index ? { ...f, name: e.target.value } : f)))
+                      }
+                    />
+                    <button
+                      className="btn ghost xs"
+                      type="button"
+                      aria-label="Remove faculty"
+                      onClick={() => setFaculties((current) => current.filter((_, i) => i !== index))}
+                    >
+                      <Icon name="x" size={12} />
+                    </button>
+                  </div>
+                  <input
+                    className="input"
+                    placeholder="Departments, comma separated: Computer Science, Mathematics"
+                    value={faculty.departments.join(", ")}
+                    onChange={(e) =>
+                      setFaculties((current) =>
+                        current.map((f, i) =>
+                          i === index
+                            ? {
+                                ...f,
+                                departments: e.target.value
+                                  .split(",")
+                                  .map((d) => d.trim())
+                                  .filter(Boolean),
+                              }
+                            : f,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+              ))}
+              <div className="field">
+                <label htmlFor="biz-years">Years of study</label>
+                <input
+                  id="biz-years"
+                  className="input"
+                  placeholder="Year 1, Year 2, Year 3"
+                  value={years}
+                  onChange={(e) => setYears(e.target.value)}
+                />
+                <span className="tiny muted">Comma separated. Leave a section empty to keep free text for it.</span>
+              </div>
+            </div>
+          )}
+
+          {education && level !== "university" && (
+            <div className="field">
+              <label htmlFor="biz-classes">Classes</label>
+              <input
+                id="biz-classes"
+                className="input"
+                placeholder="Form 1, Form 2, Form 3, Form 4, Form 5"
+                value={classes}
+                onChange={(e) => setClasses(e.target.value)}
+              />
+              <span className="tiny muted">These become the class dropdown payers choose from.</span>
+            </div>
+          )}
+
+          <div className="btn-row">
+            <button className="btn primary sm" type="button" onClick={saveDetails} disabled={busy}>
+              <Icon name="shield-check" size={13} /> {busy ? "Saving…" : "Save settings"}
+            </button>
+          </div>
+
+          <div className="hairline" />
+
+          <div className="row gap-10" style={{ flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div className="field grow" style={{ minWidth: 150 }}>
+              <label htmlFor="biz-new-pin">New 4-digit PIN</label>
+              <input
+                id="biz-new-pin"
+                className="input"
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+              />
+            </div>
+            <div className="field grow" style={{ minWidth: 150 }}>
+              <label htmlFor="biz-new-pin2">Repeat it</label>
+              <input
+                id="biz-new-pin2"
+                className="input"
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={newPin2}
+                onChange={(e) => setNewPin2(e.target.value.replace(/\D/g, ""))}
+              />
+            </div>
+            <button
+              className="btn soft sm"
+              type="button"
+              disabled={busy || newPin.length !== 4 || newPin !== newPin2}
+              onClick={async () => {
+                if (await post({ action: "pin", pin: newPin })) {
+                  setNewPin("");
+                  setNewPin2("");
+                }
+              }}
+            >
+              <Icon name="lock" size={13} /> Change PIN
+            </button>
+          </div>
+
+          <div className="hairline" />
+
+          <div>
+            <div className="up" style={{ color: "var(--coral)" }}>
+              Leaving the platform
+            </div>
+            <p className="tiny muted" style={{ marginTop: 4, lineHeight: 1.5 }}>
+              Closing stops new payments but keeps every receipt and lets you reopen later. Deleting removes this listing
+              for good — customers keep the receipts they already have, but the payee disappears from the app.
+            </p>
+            <div className="btn-row" style={{ marginTop: 8 }}>
+              {profile.closedAt ? (
+                <button className="btn soft sm" type="button" disabled={busy} onClick={() => void post({ action: "reopen" })}>
+                  <Icon name="shield-check" size={13} /> Reopen listing
+                </button>
+              ) : (
+                <button
+                  className="btn ghost sm"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    if (window.confirm(`Close ${profile.name}? Customers will no longer be able to pay it.`)) {
+                      void post({ action: "close" });
+                    }
+                  }}
+                >
+                  <Icon name="lock" size={13} /> Close listing
+                </button>
+              )}
+            </div>
+            <div className="row gap-8" style={{ marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                className="input"
+                style={{ maxWidth: 240 }}
+                placeholder={`Type ${profile.name} to confirm`}
+                value={confirmName}
+                onChange={(e) => setConfirmName(e.target.value)}
+              />
+              <button
+                className="btn danger sm"
+                type="button"
+                disabled={busy || confirmName.trim().toLowerCase() !== profile.name.toLowerCase()}
+                onClick={async () => {
+                  if (await post({ action: "delete", confirm: confirmName })) onDeleted();
+                }}
+              >
+                <Icon name="x" size={13} /> Delete this business
+              </button>
+            </div>
+          </div>
+
+          {failure && (
+            <div className="row gap-8 tiny" style={{ color: "var(--coral)", alignItems: "center" }}>
+              <Icon name="alert" size={13} /> {failure}
+            </div>
+          )}
+          {message && (
+            <div className="row gap-8 tiny" style={{ color: "var(--mint)", alignItems: "center" }}>
+              <Icon name="shield-check" size={13} /> {message}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 

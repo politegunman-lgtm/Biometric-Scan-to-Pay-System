@@ -78,21 +78,21 @@ test("portal groups fees by reason, class and department", async () => {
     amountXAF: 25_000,
     reasonId: "school_fees",
     payerFor: "Marie Claire Ngo",
-    payerDetails: { class: "Form 4 B" },
+    payerDetails: { class: "Form 4" },
   });
   await pay(db, {
     merchantId: "svc_lycee",
     amountXAF: 12_000,
     reasonId: "library_books",
     payerFor: "Paul Biya Jr",
-    payerDetails: { class: "Form 4 B" },
+    payerDetails: { class: "Form 4" },
   });
   await pay(db, {
     merchantId: "svc_uy1",
     amountXAF: 120_000,
     reasonId: "tuition",
     payerFor: "Aicha Moussa",
-    payerDetails: { faculty: "Science", department: "Computer Science", year: "Year 2" },
+    payerDetails: { faculty: "Faculty of Science", department: "Computer Science", year: "Year 2" },
   });
 
   const byReason = portalView(db, lycee, { groupBy: "reason" });
@@ -102,7 +102,7 @@ test("portal groups fees by reason, class and department", async () => {
   assert.ok(labels.includes("School fees") && labels.includes("Library books"));
 
   const byClass = portalView(db, lycee, { groupBy: "class" });
-  const form4 = byClass.groups.find((g) => g.label === "Form 4 B");
+  const form4 = byClass.groups.find((g) => g.label === "Form 4");
   assert.ok(form4, "class cohort exists");
   assert.equal(form4!.count, 2);
   assert.equal(form4!.totalXAF, 37_000);
@@ -113,8 +113,8 @@ test("portal groups fees by reason, class and department", async () => {
   assert.ok(uniView.groups.some((g) => g.label === "Computer Science" && g.totalXAF === 120_000));
   const newest = uniView.payments[0];
   assert.equal(newest.payerDetails?.year, "Year 2");
-  assert.equal(newest.payerDetails?.faculty, "Science");
-  assert.ok(uniView.facets.faculty.some((f) => f.value === "Science"));
+  assert.equal(newest.payerDetails?.faculty, "Faculty of Science");
+  assert.ok(uniView.facets.faculty.some((f) => f.value === "Faculty of Science"));
   // Scoping: the school's payments never appear in the university's ledger.
   assert.ok(uniView.payments.every((p) => p.reason !== "Library books"));
 });
@@ -126,14 +126,14 @@ test("search and filters narrow the ledger, and the CSV mirrors the view", async
     amountXAF: 25_000,
     reasonId: "school_fees",
     payerFor: "Marie Claire Ngo",
-    payerDetails: { class: "Form 4 B" },
+    payerDetails: { class: "Form 4" },
   });
   await pay(db, {
     merchantId: "svc_lycee",
     amountXAF: 9_000,
     reasonId: "exam_fees",
     payerFor: "Ibrahim Sali",
-    payerDetails: { class: "Form 5 A" },
+    payerDetails: { class: "Form 5" },
   });
   const lycee = db.merchants.find((m) => m.id === "svc_lycee")!;
 
@@ -145,7 +145,7 @@ test("search and filters narrow the ledger, and the CSV mirrors the view", async
   assert.equal(exam.payments.length, 1);
   assert.equal(exam.stats.volumeXAF, 9_000);
 
-  const formA = portalView(db, lycee, { field: "class", value: "Form 5 A" });
+  const formA = portalView(db, lycee, { field: "class", value: "Form 5" });
   assert.equal(formA.payments.length, 1);
 
   const none = portalView(db, lycee, { q: "nobody-by-that-name" });
@@ -157,7 +157,7 @@ test("search and filters narrow the ledger, and the CSV mirrors the view", async
   assert.match(lines[0], /paid_at,receipt,customer,student,reason,class/);
   assert.match(lines[1], /Ibrahim Sali/);
   assert.match(lines[1], /Exam fees/);
-  assert.match(lines[1], /Form 5 A/);
+  assert.match(lines[1], /Form 5/);
 });
 
 test("declined attempts stay out of the payee's books unless asked for", async () => {
@@ -168,7 +168,7 @@ test("declined attempts stay out of the payee's books unless asked for", async (
     amountXAF: 15_000,
     reasonId: "school_fees",
     payerFor: "Marie Claire Ngo",
-    payerDetails: { class: "Form 4 B" },
+    payerDetails: { class: "Form 4" },
   });
   // A blocked attempt at the same merchant.
   db.txns.unshift({

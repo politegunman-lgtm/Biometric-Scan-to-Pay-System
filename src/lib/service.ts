@@ -197,6 +197,7 @@ export function createPaymentRequest(
 ): PaymentRequest {
   const merchant = db.merchants.find((m) => m.id === input.merchantId);
   if (!merchant) throw new Error("Unknown merchant");
+  if (merchant.closedAt) throw new Error(`${merchant.name} has closed its listing — payments are paused`);
   const chosen = resolveReason(merchant, input.reasonId, input.payerFor, input.payerDetails);
   const amount = Math.round(input.amountXAF);
   if (!Number.isFinite(amount) || amount < 100 || amount > 2_000_000) {

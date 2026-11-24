@@ -6,7 +6,8 @@ import { MerchantAvatar } from "@/components/MerchantAvatar";
 import { Icon } from "@/components/icons";
 import { EmptyState } from "@/components/controls";
 import { apiJson, sleep } from "@/lib/client";
-import { PAYER_FIELDS, reasonsFor } from "@/lib/reasons";
+import { cohortsFor, fieldOptions } from "@/lib/cohorts";
+import { PAYER_FIELDS, payerGaps, reasonsFor } from "@/lib/reasons";
 import { CATEGORY_META, money, relativeTime } from "@/lib/format";
 import type { PayerDetails, PayerField, PaymentReason, PaymentRequest } from "@/lib/types";
 
@@ -23,6 +24,8 @@ interface Payee {
   msisdnMasked: string;
   isNew?: boolean;
   reasons: PaymentReason[];
+  cohorts: { faculties: { name: string; departments: string[] }[]; years: string[]; classes: string[] };
+  cohortsPublished: boolean;
 }
 
 interface Directory {
@@ -396,23 +399,28 @@ export default function ScanPage() {
               disabled={!selected || manualAmount < 100}
               onClick={() => {
                 if (!selected) return;
-                void startPayment(
-                  {
-                    id: selected.id,
-                    name: selected.name,
-                    initials: selected.name.slice(0, 1),
-                    kind: "business",
-                    category: selected.category,
-                    tagline: null,
-                    logoHue: selected.logoHue,
-                    verified: selected.verified,
-                    code: selected.code,
-                    msisdnMasked: "",
-                    reasons: reasonsFor(selected),
-                  },
-                  manualAmount,
-                  "Manual entry",
-                );
+                // Open the same composer as the directory, so a scanned school
+                // can still ask for its reason, student and cohort fields.
+                setPayee({
+                  id: selected.id,
+                  name: selected.name,
+                  initials: selected.name.slice(0, 1),
+                  kind: "business",
+                  category: selected.category,
+                  tagline: null,
+                  logoHue: selected.logoHue,
+                  verified: selected.verified,
+                  code: selected.code,
+                  msisdnMasked: "",
+                  reasons: reasonsFor(selected),
+                  cohorts: cohortsFor(selected),
+                  cohortsPublished: Boolean(selected.cohorts),
+                });
+                setSendAmount(String(manualAmount));
+                setReasonId("");
+                setPayerFor("");
+                setPayerDetails({});
+                window.setTimeout(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
               }}
             >
               <Icon name="fingerprint" size={15} />
@@ -487,15 +495,22 @@ export default function ScanPage() {
                         setReasonId(e.target.value);
                         const next = payee.reasons.find((r) => r.id === e.target.value);
                         if (!next?.askStudent) setPayerFor("");
+                        setPayerDetails({});
                       }}
+                      aria-invalid={!reasonId}
                     >
-                      <option value="">Choose a reason (optional)…</option>
+                      <option value="">Choose a reason…</option>
                       {payee.reasons.map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.label}
                         </option>
                       ))}
                     </select>
+                    <span className="tiny" style={{ color: reasonId ? "var(--muted)" : "var(--accent)" }}>
+                      {reasonId
+                        ? "The reason travels with the signed request onto the receipt."
+                        : "Pick a reason first — the payee needs it to reconcile the payment."}
+                    </span>
                   </div>
                   {payee.reasons.find((r) => r.id === reasonId)?.askStudent && (
                     <div className="field" style={{ marginTop: 10 }}>
@@ -514,38 +529,96 @@ export default function ScanPage() {
                   {(payee.reasons.find((r) => r.id === reasonId)?.askFields ?? []).map((field) => {
                     const meta = PAYER_FIELDS.find((f) => f.id === field)!;
                     const examples: Record<PayerField, string> = {
-                      class: "e.g. Form 4 B",
+                      class: "e.g. Form 4",
                       faculty: "e.g. Faculty of Science",
                       department: "e.g. Computer Science",
                       year: "e.g. Year 2",
                     };
+                    // The payee publishes these lists; once it has, the payer
+                    // selects instead of spelling, so the portal groups cleanly.
+                    const options = fieldOptions(payee.cohorts, field, payerDetails.faculty);
                     return (
                       <div className="field" key={field} style={{ marginTop: 10 }}>
                         <label htmlFor={`payer-${field}`}>{meta.label}</label>
-                        <input
-                          id={`payer-${field}`}
-                          className="input"
-                          placeholder={examples[field]}
-                          value={payerDetails[field] ?? ""}
-                          maxLength={40}
-                          onChange={(e) => setPayerDetails((current) => ({ ...current, [field]: e.target.value }))}
-                        />
+                        {options.length > 0 ? (
+                          <select
+                            id={`payer-${field}`}
+                            className="select"
+                            value={payerDetails[field] ?? ""}
+                            aria-invalid={!payerDetails[field]}
+                            onChange={(e) =>
+                              setPayerDetails((current) => {
+                                const next = { ...current, [field]: e.target.value };
+                                // A new faculty invalidates the department chosen under the old one.
+                                if (field === "faculty") delete next.department;
+                                return next;
+                              })
+                            }
+                          >
+                            <option value="">
+                              {field === "department" && !payerDetails.faculty
+                                ? "Choose a faculty first…"
+                                : `Choose ${meta.label.toLowerCase()}…`}
+                            </option>
+                            {options.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            id={`payer-${field}`}
+                            className="input"
+                            placeholder={examples[field]}
+                            value={payerDetails[field] ?? ""}
+                            maxLength={40}
+                            onChange={(e) => setPayerDetails((current) => ({ ...current, [field]: e.target.value }))}
+                          />
+                        )}
+                        {payee.cohortsPublished && options.length > 0 && (
+                          <span className="tiny muted">From the list {payee.name} published.</span>
+                        )}
                       </div>
                     );
                   })}
                 </>
               )}
 
-              <button
-                className="btn primary block"
-                type="button"
-                style={{ marginTop: 12 }}
-                disabled={sending || Number(sendAmount) < 100}
-                onClick={() => void startPayment(payee, Number(sendAmount), payee.kind === "person" ? "P2P transfer" : "Bill payment")}
-              >
-                <Icon name="fingerprint" size={15} />
-                {sending ? "Preparing…" : `Send ${Number(sendAmount) >= 100 ? money(Number(sendAmount)) : ""}`}
-              </button>
+              {(() => {
+                const gaps = payerGaps({
+                  payeeName: payee.name,
+                  reasons: payee.reasons,
+                  reasonId,
+                  payerFor,
+                  payerDetails,
+                });
+                return (
+                  <>
+                    <button
+                      className="btn primary block"
+                      type="button"
+                      style={{ marginTop: 12 }}
+                      disabled={sending || Number(sendAmount) < 100 || gaps.length > 0}
+                      onClick={() =>
+                        void startPayment(payee, Number(sendAmount), payee.kind === "person" ? "P2P transfer" : "Bill payment")
+                      }
+                    >
+                      <Icon name="fingerprint" size={15} />
+                      {sending ? "Preparing…" : gaps.length > 0 ? "Complete the fields above" : `Send ${Number(sendAmount) >= 100 ? money(Number(sendAmount)) : ""}`}
+                    </button>
+                    {gaps.length > 0 && (
+                      <div
+                        className="tiny"
+                        style={{ marginTop: 8, color: "var(--coral)", lineHeight: 1.45, display: "flex", gap: 6 }}
+                      >
+                        <Icon name="alert" size={12} />
+                        <span>{gaps[0].message}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <div className="tiny muted" style={{ marginTop: 8, lineHeight: 1.45 }}>
                 The request is signed first; your fingerprint authorises it. {payee.kind === "person" ? "Transfers arrive instantly." : "Bills post to the operator."}
               </div>

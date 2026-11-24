@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { hashPin, hmac, sha256Hex, timingSafeEqualStr, verifyPin } from "./crypto";
+import { businessProfile } from "./businessAdmin";
 import { reasonsFor } from "./reasons";
 import type { Database } from "./store";
 import type { Merchant, PayerField, Txn } from "./types";
@@ -196,6 +197,7 @@ export function portalView(db: Database, merchant: Merchant, filters: PortalFilt
       pinIsOwn: Boolean(merchant.portalPin),
     },
     reasons: reasonsFor(merchant),
+    profile: businessProfile(merchant),
     filters: { ...filters, groupBy },
     stats: {
       received: counted.length,

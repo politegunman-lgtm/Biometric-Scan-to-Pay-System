@@ -194,6 +194,18 @@ export interface Merchant {
   portalPin?: { salt: string; hash: string } | null;
   /** Set for education payees so tuition-style reasons ask for the right fields. */
   schoolLevel?: SchoolLevel;
+  /**
+   * The lists the payee publishes for faculty / department / class / year, edited
+   * from the business portal. When present they are authoritative: a payment may
+   * only carry values from the list.
+   */
+  cohorts?: {
+    faculties: { name: string; departments: string[] }[];
+    years: string[];
+    classes: string[];
+  };
+  /** Set when the business closes its listing; history stays, new payments stop. */
+  closedAt?: string | null;
 }
 
 export interface PaymentRequest {

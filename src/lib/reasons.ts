@@ -1,3 +1,4 @@
+import { cohortsPublished, matchOption, optionsForField } from "./cohorts";
 import type { Merchant, MerchantCategory, PayerDetails, PayerField, PaymentReason, SchoolLevel } from "./types";
 
 /**
@@ -130,6 +131,49 @@ export function normaliseReasons(input: unknown): PaymentReason[] {
   return out;
 }
 
+export interface PayerGap {
+  /** `reason` for the reason itself, `payerFor` for the student, else a cohort field. */
+  field: "reason" | "payerFor" | PayerField;
+  message: string;
+}
+
+/**
+ * What still has to be filled before a payment may continue.
+ *
+ * Shared by the web and the phone so the reminder a payer sees matches exactly
+ * what the server will enforce — no payment is signed, then bounced.
+ */
+export function payerGaps(input: {
+  payeeName: string;
+  reasons: PaymentReason[];
+  reasonId?: string;
+  payerFor?: string;
+  payerDetails?: PayerDetails;
+}): PayerGap[] {
+  const offered = input.reasons;
+  if (offered.length === 0) return [];
+
+  const gaps: PayerGap[] = [];
+  const reason = offered.find((r) => r.id === input.reasonId);
+  if (!reason) {
+    gaps.push({ field: "reason", message: `Choose a reason for this payment to ${input.payeeName}` });
+    return gaps;
+  }
+
+  if (reason.askStudent && (input.payerFor ?? "").trim().length < 2) {
+    gaps.push({ field: "payerFor", message: `Enter the student's name for "${reason.label}"` });
+  }
+
+  for (const field of reason.askFields ?? []) {
+    const value = String(input.payerDetails?.[field] ?? "").trim();
+    if (!value) {
+      const label = PAYER_FIELDS.find((f) => f.id === field)?.label ?? field;
+      gaps.push({ field, message: `${label} is required for "${reason.label}"` });
+    }
+  }
+  return gaps;
+}
+
 export interface ResolvedReason {
   reasonId?: string;
   reason?: string;
@@ -164,13 +208,43 @@ export function resolveReason(
   }
 
   const details: PayerDetails = {};
-  for (const field of reason.askFields ?? []) {
+  // Faculty before department: the department list depends on the faculty chosen.
+  const order = PAYER_FIELDS.map((f) => f.id);
+  const fields = [...(reason.askFields ?? [])].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  const published = cohortsPublished(merchant);
+
+  for (const field of fields) {
+    const label = PAYER_FIELDS.find((f) => f.id === field)?.label ?? field;
     const value = String(payerDetails?.[field] ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
     if (value.length < 1) {
-      const label = PAYER_FIELDS.find((f) => f.id === field)?.label ?? field;
       throw new Error(`${label} is required for "${reason.label}"`);
     }
+
+    // Once the payee publishes its lists, the value has to come from one of them
+    // — otherwise the payer is choosing, not spelling, and the portal's grouping
+    // stays clean.
+    if (published) {
+      const options = optionsForField(merchant, field, details.faculty);
+      if (options.length > 0) {
+        const canonical = matchOption(options, value);
+        if (!canonical) {
+          throw new Error(`Choose a ${label.toLowerCase()} from the list for "${reason.label}"`);
+        }
+        details[field] = canonical;
+        continue;
+      }
+    }
     details[field] = value;
+  }
+
+  // A department has to belong to the faculty it was filed under.
+  if (details.faculty && details.department && published) {
+    const departments = optionsForField(merchant, "department", details.faculty);
+    if (departments.length > 0) {
+      const canonical = matchOption(departments, details.department);
+      if (!canonical) throw new Error(`${details.department} is not a department of ${details.faculty}`);
+      details.department = canonical;
+    }
   }
 
   return {

@@ -130,7 +130,7 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
 | `GET /api/enroll` · `POST /api/enroll` | Business self-enrolment: types, school levels, cities and the newest listings. A valid enrolment — including `schoolLevel` for schools and a 4-digit `pin` — becomes a payable payee immediately. |
 | `GET /api/export?type=ledger` · `?type=recipients` | Your payments, or an aggregated list of who you paid. |
 | `GET /api/reasons?merchantId=` · `POST /api/reasons` | The reasons a payee publishes, and the editor behind them (merchant terminal or portal). |
-| `POST /api/business` | `{code, pin}` signs a payee into its portal and returns a scoped 8-hour token; `{action:"data", token, filters}` returns that payee's records only. |
+| `POST /api/business` | `{code, pin}` signs a payee into its portal and returns a scoped 8-hour token; `{action:"data", token, filters}` returns that payee's records only; `settings` / `pin` / `close` / `reopen` / `delete` edit the business itself, always scoped to the token's payee. |
 | `GET /api/business/export?token=…` | The current filtered view as CSV (student, reason, class, faculty, department, year, amount, receipt). |
 
 ### Payment options, business enrolment and recipients
@@ -146,6 +146,17 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
   asked for: a primary or secondary school publishes reasons that collect a **class** (`Form 4 B`), while a university's
   tuition, registration and transcript reasons collect **faculty → department → year**. The portal then groups by exactly
   those fields, so the same value that was typed at the counter is the one the bursar filters on.
+- **Dropdowns, not free text.** A school or university publishes its faculty / department / class / year lists from
+  **Business settings** in the portal. Payers then type only the student's name and *select* the rest; the server
+  canonicalises the value ("faculty of science" → **Faculty of Science**) and rejects anything not on the list, so the
+  portal's grouping never splits the same faculty across three spellings. A payee that has not published lists yet keeps
+  free-text entry, and the seeded Lycée and Université de Yaoundé I ship with published lists so the demo behaves like a
+  real school.
+- **A business can edit or leave.** The portal's **Business settings** panel edits the trading name, tagline, phone, city,
+  school level, the cohort lists and the access PIN. Below it, **Close listing** stops new payments and cancels open
+  requests while keeping every receipt (and can be reopened); **Delete this business** removes the payee permanently after
+  typing its name — past receipts stay readable because each transaction carries its own snapshot of the merchant name
+  and code.
 - **Codes are issued, PINs are chosen.** The five-character payee code is minted by the server — from an unambiguous
   alphabet (no `I`, `O`, `0`, `1`) and checked against both the live payee list and `secrets.issuedCodes`, a permanent
   ledger of every code ever issued, so a code is never reused for a different organisation even if a listing is withdrawn.
@@ -156,8 +167,9 @@ P95 (150 000 FCFA) so sending money to a friend is not punished as an anomaly, w
   Both fields, plus any cohort details the reason asks for (`txn.payerFor`, `txn.payerDetails`), travel with the signed
   request onto the receipt and into the ledger CSV, so a school can reconcile fees from the terminal or the export. Schools, clinics and utilities start with a template and edit
   it under **Payment reasons** in the terminal; the directory hands the list to both apps, so the dropdown is always the
-  payee's current list. Reasons are validated server-side — an unknown reason, or a student-name reason without a name, is
-  rejected when the request is minted.
+  payee's current list. Reasons are validated server-side — an unknown reason, a student-name reason without a name, or a
+  cohort value outside the payee's published list is rejected when the request is minted. The composer blocks the same
+  gaps before anything is signed: no reason, no signature.
 - **Business portal.** `/business` is the payee's own seat: sign in with the five-character payee code plus the 4-digit
   PIN chosen at enrolment (seeded demo payees use `2468` until they change it). The session is a signed, 8-hour, payee-scoped token —
   a school can only ever read payments addressed to it, and the customer wallet, biometrics and history are not visible
@@ -253,6 +265,8 @@ src/lib/providers.ts    MTN MoMo / Orange Money / Express Union adapters
 src/lib/accounts.ts     wallet linking / default wallet, business enrolment, recipients
 src/lib/reasons.ts      reason-for-payment catalogue, validation, student-name/cohort rules
 src/lib/portal.ts       payee-scoped tokens, record filtering + grouping, portal CSV
+src/lib/businessAdmin.ts business editing, PIN rotation, close / reopen / delete
+src/lib/cohorts.ts      faculty · department · class · year lists and their validation
 src/components/         app shell, pay sheet, biometric pad, charts, risk UI
 tests/                  unit tests (fraud, offline, biometrics, crypto, accounts)
 scripts/smoke.mts       end-to-end API walkthrough

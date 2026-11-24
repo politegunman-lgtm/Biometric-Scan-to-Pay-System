@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { apiJson } from "../lib/api";
+import { fieldOptions, payerGaps } from "../lib/cohorts";
 import { CATEGORY_LABEL, expiryLabel, money } from "../lib/format";
 import type { Directory, PayTarget, Payee, PayerDetails, PayerField, PaymentReason, PaymentRequest } from "../lib/types";
 import { useApp } from "../state";
@@ -589,6 +590,11 @@ export function Scan({
                         );
                       })}
                     </ScrollView>
+                    {!reason && (
+                      <Text style={[styles.hint, { color: colors.coral, marginTop: 6 }]}>
+                        Choose a reason before continuing — {composer.name} needs it to reconcile the payment.
+                      </Text>
+                    )}
                     {reason?.askStudent && (
                       <>
                         <Text style={styles.composerLabel}>STUDENT NAME</Text>
@@ -604,33 +610,83 @@ export function Scan({
                         />
                       </>
                     )}
-                    {(reason?.askFields ?? []).map((field) => (
-                      <View key={field} style={{ marginTop: 8 }}>
-                        <Text style={styles.composerLabel}>{FIELD_LABEL[field].toUpperCase()}</Text>
-                        <TextInput
-                          style={styles.fieldInput}
-                          value={payerDetails[field] ?? ""}
-                          onChangeText={(v) => setPayerDetails((current) => ({ ...current, [field]: v }))}
-                          placeholder={PLACEHOLDER[field]}
-                          placeholderTextColor={colors.muted}
-                          maxLength={40}
-                          onFocus={revealSheetFields}
-                        />
-                      </View>
-                    ))}
+                    {(reason?.askFields ?? []).map((field) => {
+                      // The payee publishes these lists (faculty, department,
+                      // class, year); once it has, the payer selects instead of
+                      // spelling, which is what keeps the portal's grouping clean.
+                      const options = fieldOptions(composer, field, payerDetails.faculty);
+                      const chosen = payerDetails[field] ?? "";
+                      return (
+                        <View key={field} style={{ marginTop: 12 }}>
+                          <Text style={styles.composerLabel}>{FIELD_LABEL[field].toUpperCase()}</Text>
+                          {options.length > 0 ? (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reasonRow}>
+                              {options.map((option) => {
+                                const active = chosen === option;
+                                return (
+                                  <TouchableOpacity
+                                    key={option}
+                                    style={[styles.reasonChip, active && styles.reasonChipActive]}
+                                    onPress={() =>
+                                      setPayerDetails((current) => {
+                                        const next = { ...current, [field]: active ? "" : option };
+                                        // A new faculty invalidates the department picked under the old one.
+                                        if (field === "faculty") delete next.department;
+                                        return next;
+                                      })
+                                    }
+                                  >
+                                    <Text style={[styles.reasonText, active && { color: colors.text }]}>{option}</Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                              {field === "department" && !payerDetails.faculty && (
+                                <Text style={[styles.hint, { marginTop: 4, marginLeft: 2 }]}>Choose a faculty first.</Text>
+                              )}
+                            </ScrollView>
+                          ) : (
+                            <TextInput
+                              style={styles.fieldInput}
+                              value={chosen}
+                              onChangeText={(v) => setPayerDetails((current) => ({ ...current, [field]: v }))}
+                              placeholder={PLACEHOLDER[field]}
+                              placeholderTextColor={colors.muted}
+                              maxLength={40}
+                              onFocus={revealSheetFields}
+                            />
+                          )}
+                        </View>
+                      );
+                    })}
                   </>
                 )}
 
-                <Button
-                  label={sending ? "Preparing…" : `Continue${Number(amount) >= 100 ? ` · ${money(Number(amount))}` : ""}`}
-                  onPress={() => void startPayment()}
-                  loading={sending}
-                  disabled={Number(amount) < 100}
-                  style={{ marginTop: 16 }}
-                />
-                <Text style={styles.hint}>
-                  A signed request is created first; your fingerprint authorises it on the next screen.
-                </Text>
+                {(() => {
+                  const gaps = payerGaps(composer, { reason, payerFor, payerDetails });
+                  return (
+                    <>
+                      <Button
+                        label={
+                          sending
+                            ? "Preparing…"
+                            : gaps.length > 0
+                              ? "Complete the fields above"
+                              : `Continue${Number(amount) >= 100 ? ` · ${money(Number(amount))}` : ""}`
+                        }
+                        onPress={() => void startPayment()}
+                        loading={sending}
+                        disabled={Number(amount) < 100 || gaps.length > 0}
+                        style={{ marginTop: 16 }}
+                      />
+                      {gaps.length > 0 && (
+                        <Text style={[styles.hint, { color: colors.coral, marginTop: 6 }]}>{gaps[0].message}</Text>
+                      )}
+                      <Text style={styles.hint}>
+                        A signed request is created first; your fingerprint authorises it on the next screen.
+                      </Text>
+                    </>
+                  );
+                })()}
               </>
             )}
             </ScrollView>

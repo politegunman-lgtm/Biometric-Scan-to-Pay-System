@@ -1,3 +1,4 @@
+import { cohortsFor } from "./cohorts";
 import { reasonsFor } from "./reasons";
 import type { Database } from "./store";
 import type { Merchant, PaymentReason } from "./types";
@@ -26,6 +27,10 @@ export interface PayeeEntry {
   isNew?: boolean;
   /** Reasons this payee offers, so the payer can pick one before authorising. */
   reasons: PaymentReason[];
+  /** Dropdown options for faculty/department/class/year, as published by the payee. */
+  cohorts: { faculties: { name: string; departments: string[] }[]; years: string[]; classes: string[] };
+  /** True when the payee has published those lists, which makes them mandatory. */
+  cohortsPublished: boolean;
 }
 
 const digits = (value: string) => value.replace(/\D/g, "");
@@ -62,6 +67,8 @@ export function toEntry(m: Merchant): PayeeEntry {
     msisdnMasked: maskMsisdn(m.msisdn),
     isNew: Boolean(m.enrolledAt),
     reasons: reasonsFor(m),
+    cohorts: cohortsFor(m),
+    cohortsPublished: Boolean(m.cohorts),
   };
 }
 
@@ -82,7 +89,8 @@ export function payeeMatches(m: Merchant, query: string): boolean {
 }
 
 export function searchDirectory(db: Database, query: string, limit = 12) {
-  const payees = db.merchants.filter((m) => !m.flagged);
+  // A closed listing keeps its receipts but is no longer payable.
+  const payees = db.merchants.filter((m) => !m.flagged && !m.closedAt);
   const people = payees.filter((m) => m.kind === "person" && payeeMatches(m, query));
   // Everything that is not a person is payable from the Bills tab: billers,
   // banks, schools — and shops that enrolled themselves or run a terminal.
@@ -130,5 +138,7 @@ export function selfEntry(db: Database): PayeeEntry | null {
     code: "YOU",
     msisdnMasked: maskMsisdn(db.user.phone),
     reasons: [],
+    cohorts: { faculties: [], years: [], classes: [] },
+    cohortsPublished: false,
   };
 }

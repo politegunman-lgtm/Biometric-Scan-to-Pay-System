@@ -113,6 +113,13 @@ own window, so the activity's resize never reaches it — the app measures the k
 caps it to the space above the keyboard, and scrolls the field you tapped into view. The Android manifest is also set to
 `softwareKeyboardLayoutMode: "resize"` for standalone builds.
 
+## Payer fields
+
+When a school publishes its lists, the amount composer shows the faculty, department, class and year options as chips
+instead of text boxes — the payer types the student's name and taps the rest. Continue stays disabled (with the first
+missing item spelled out) until the reason, student name and every cohort field are filled, so a request is never signed
+only to be bounced by the server.
+
 ## Notes and limits
 
 - **A physical device is required** for meaningful testing: simulators have no camera and only fake biometrics.
