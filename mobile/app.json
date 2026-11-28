@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Scan to Pay",
+    "slug": "scan-to-pay",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "scantopay",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#06080A",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "cm.scantopay.demo",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Scan to Pay uses Face ID to authorise payments.",
+        "NSCameraUsageDescription": "Scan to Pay uses the camera to read merchant QR codes."
+      }
+    },
+    "android": {
+      "package": "cm.scantopay.demo",
+      "permissions": [
+        "CAMERA",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
+      ],
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "backgroundColor": "#06080A",
+      "resizeMode": "contain"
+    }
+  }
+}
